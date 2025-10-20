@@ -1,11 +1,11 @@
-<!DOCTYPE html>
+<!DOCTYPE html> 
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
+    <meta charset="UTF-8"> 
     <title>Three.js Model Viewer with FPS Controls</title>
     <style>
         body { margin: 0; overflow: hidden; } /* Remove scrollbars */
-        canvas { display: block; }
+        canvas { display: block; } 
         #loading { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: black; display: flex; justify-content: center; align-items: center; z-index: 1000; }
         #loading img { width: 100%; height: 100%; object-fit: cover; }
         #loading .spinner { position: absolute; width: 50px; height: 50px; border: 5px solid rgba(255, 255, 255, 0.3); border-top: 5px solid white; border-radius: 50%; animation: spin 1s linear infinite; display: none; }
@@ -24,7 +24,7 @@
             }
         }
     </script>
-</head>
+</head> 
 <body>
     <div id="loading">
         <img src="https://raw.githubusercontent.com/decentralize-dfw/vea_001/main/VEADEMO1.jpg" alt="Loading Background">
@@ -695,7 +695,12 @@
                     }
                 }
             });
-            // Check for E press
+            // aiming to model should be able inside of the whole offset, neden dibine girmem gerkeiyor ya? sıfırına inmem gerekiyor? o alanın içindeyken ne zaman kameram modelin kendi bounding boxuna dönse E to animate i görmem gereiyor. zone un içindeyken haydi kankam benim
+           //press E to animate nereye kayboldu ya sikicem yapacağın işi ya????? amınaoyim böyle işin
+//ne zaman bounding boxun offsetli zone unun içindeysem, ve kameram o modele dönükse, onun bounding boxuna, o zaman press E to animate yazısnı görmeliyim. ve bastığım zaman aniamte etmeki, zonedan çıkana kadar anime olarak devam etmelidir.
+ 
+//aynı şekilde altta gözüken description da modele kameram dönükken gözükmelidir. otomatik anime edilen modellerde yani curator gibi, o direk alana girdiğimizde çalışıp çıktığımzda durabilir! çöz bunu artık ya
+           
             if (animateKeyPressed && currentAnimateEntry && !currentAnimateEntry.animated) {
                 startAnimation(currentAnimateEntry);
                 if (currentAnimateEntry.config.loop) {
@@ -714,6 +719,11 @@
             ssaoPass.setSize(window.innerWidth, window.innerHeight);
             bloomPass.setSize(window.innerWidth, window.innerHeight);
         });
+        // aiming to model should be able inside of the whole offset, neden dibine girmem gerkeiyor ya? sıfırına inmem gerekiyor? o alanın içindeyken ne zaman kameram modelin kendi bounding boxuna dönse E to animate i görmem gereiyor. zone un içindeyken haydi kankam benim
+           //press E to animate nereye kayboldu ya sikicem yapacağın işi ya????? amınaoyim böyle işin
+//ne zaman bounding boxun offsetli zone unun içindeysem, ve kameram o modele dönükse, onun bounding boxuna, o zaman press E to animate yazısnı görmeliyim. ve bastığım zaman aniamte etmeki, zonedan çıkana kadar anime olarak devam etmelidir.
+ 
+//aynı şekilde altta gözüken description da modele kameram dönükken gözükmelidir. otomatik anime edilen modellerde yani curator gibi, o direk alana girdiğimizde çalışıp çıktığımzda durabilir! çöz bunu artık ya
     </script>
 </body>
-</html>  // aiming to model should be able inside of the whole offset, neden dibine girmem gerkeiyor ya? sıfırına inmem gerekiyor? o alanın içindeyken ne zaman kameram modelin kendi bounding boxuna dönse E to animate i görmem gereiyor. zone un içindeyken haydi kankam benim
+</html>  
