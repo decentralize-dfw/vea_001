@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Three.js Model Viewer with FPS Controls</title>
+    <style>
+        body { margin: 0; overflow: hidden; } /* Remove scrollbars */
+        canvas { display: block; }
+        #loading { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: black; display: flex; justify-content: center; align-items: center; z-index: 1000; }
+        #loading img { width: 100%; height: 100%; object-fit: cover; }
+        #loading .spinner { position: absolute; width: 50px; height: 50px; border: 5px solid rgba(255, 255, 255, 0.3); border-top: 5px solid white; border-radius: 50%; animation: spin 1s linear infinite; display: none; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        #loading-text { position: absolute; bottom: 10px; left: 10px; color: white; font-family: Helvetica; font-size: 12px; display: none; }
+        #instructions { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; font-size: 24px; text-align: center; display: none; font-family: Helvetica; }
+        #description { position: absolute; bottom: 10px; left: 50px; right: 50px; color: white; font-size: 10px; font-family: Helvetica; font-weight: 500; text-align: center; display: none; }
+        #animate-prompt { position: absolute; left: 10px; bottom: 10px; color: white; font-size: 12px; font-family: Helvetica; display: none; }
+    </style>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.158.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.158.0/examples/jsm/",
+                "three-mesh-bvh": "https://unpkg.com/three-mesh-bvh@0.7.0/build/index.module.js"
+            }
+        }
+    </script>
+</head>
+<body>
+    <div id="loading">
+        <img src="https://raw.githubusercontent.com/decentralize-dfw/vea_001/main/VEADEMO1.jpg" alt="Loading Background">
+        <div class="spinner"></div>
+        <div id="loading-text">Loading experience... 0%</div>
+        <button id="initiate" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); padding: 10px 20px; font-size: 20px; z-index: 1001;">Initiate</button>
+    </div>
+    <div id="instructions">Click to enter<br/>WASD: Move<br/>Space: Jump<br/>Mouse: Look<br/>Shift: Sprint</div>
+    <button id="fullscreenButton" style="position: absolute; left: 10px; top: 10px; font-size: 12px;">Full Screen</button>
+    <div id="description"></div>
+    <div id="animate-prompt">Press E to animate</div>
+    <script type="module">
+        import * as THREE from 'three';
+        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+        import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+        import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+        import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
+        import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
+        import { SSAOPass } from 'three/addons/postprocessing/SSAOPass.js';
+        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+        import { acceleratedRaycast, computeBoundsTree, disposeBoundsTree } from 'three-mesh-bvh';
+        // Accelerate raycasting with BVH
+        THREE.BufferGeometry.prototype.computeBoundsTree = computeBoundsTree;
+        THREE.BufferGeometry.prototype.disposeBoundsTree = disposeBoundsTree;
+        THREE.Mesh.prototype.raycast = acceleratedRaycast;
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 0.5;
+        renderer.outputColorSpace = THREE.SRGBColorSpace;
+        renderer.physicallyCorrectLights = true;
+        document.body.appendChild(renderer.domElement);
+        const composer = new EffectComposer(renderer);
+        const renderPass = new RenderPass(scene, camera);
+        composer.addPass(renderPass);
+        const ssaoPass = new SSAOPass(scene, camera, window.innerWidth, window.innerHeight);
+        ssaoPass.kernelRadius = 16;
+        ssaoPass.minDistance = 0.005;
+        ssaoPass.maxDistance = 0.1;
+        composer.addPass(ssaoPass);
+        const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.5, 0.4, 0.85);
+        composer.addPass(bloomPass);
+        // Audio Listener
+        const audioListener = new THREE.AudioListener();
+        camera.add(audioListener);
+        // PointerLockControls
+        const controls = new PointerLockControls(camera, document.body);
+        scene.add(controls.getObject());
+        const blocker = document.getElementById('instructions');
+        // Show instructions after loading and lock on click
+        const animatePrompt = document.getElementById('animate-prompt');
+        // Allow re-lock on click if unlocked
+        document.addEventListener('click', () => {
+            if (!controls.isLocked) {
+                controls.lock();
+            }
+        });
+        // Movement variables
+        let baseMoveSpeed = 5;
+        let currentMoveSpeed = baseMoveSpeed;
+        const jumpVelocity = 5;
+        let velocity = new THREE.Vector3();
+        let direction = new THREE.Vector3();
+        let prevTime = performance.now();
+        const gravity = 9.8;
+        let onFloor = true;
+        let animateKeyPressed = false;
+        const keys = { forward: false, backward: false, left: false, right: false, jump: false, sprint: false };
+        document.addEventListener('keydown', (event) => {
+            event.preventDefault();
+            switch (event.code) {
+                case 'KeyW': keys.forward = true; break;
+                case 'KeyS': keys.backward = true; break;
+                case 'KeyA': keys.left = true; break;
+                case 'KeyD': keys.right = true; break;
+                case 'Space': if (onFloor) { keys.jump = true; } break;
+                case 'ShiftLeft': keys.sprint = true; currentMoveSpeed = baseMoveSpeed * 4; break;
+                case 'KeyE': animateKeyPressed = true; break;
+            }
+        });
+        document.addEventListener('keyup', (event) => {
+            event.preventDefault();
+            switch (event.code) {
+                case 'KeyW': keys.forward = false; break;
+                case 'KeyS': keys.backward = false; break;
+                case 'KeyA': keys.left = false; break;
+                case 'KeyD': keys.right = false; break;
+                case 'Space': keys.jump = false; break;
+                case 'ShiftLeft': keys.sprint = false; currentMoveSpeed = baseMoveSpeed; break;
+                case 'KeyE': animateKeyPressed = false; break;
+            }
+        });
+        // Handle pointer lock error
+        document.addEventListener('pointerlockerror', () => {
+            console.error('THREE.PointerLockControls: Unable to use Pointer Lock API');
+            blocker.style.display = 'block';
+        });
+        controls.addEventListener('lock', () => {
+            blocker.style.display = 'none';
+        });
+        controls.addEventListener('unlock', () => {
+            blocker.style.display = 'block';
+        });
+        // Model configurations with updated names and descriptions
+        const modelConfigs = [
+            {
+                url: 'https://raw.githubusercontent.com/decentralize-dfw/c2w2-glb/main/curator-900-opt-v67.glb',
+                name: 'curator',
+                description: 'Model 1: curator',
+                position: { x: 0, y: 0.3, z: 0 },
+                rotation: { x: 0, y: 0, z: 0 },
+                scale: { x: 3, y: 3, z: 3 },
+                animate: true,
+                loop: true,
+                with_press: false,
+                sound: 'https://raw.githubusercontent.com/decentralize-dfw/c2w2runway/main/part1-clean-v3-3-kiddo.mp3',
+                offset: 4,
+                collider: false
+            },
+            {
+                url: 'https://raw.githubusercontent.com/decentralize-dfw/c2w2-glb/main/mare-900-opt-v79.glb',
+                name: 'mare',
+                description: 'Model 2: mare',
+                position: { x: 15, y: 0, z: 15 },
+                rotation: { x: 0, y: 90, z: 0 },
+                scale: { x: 3, y: 3, z: 3 },
+                animate: true,
+                loop: true,
+                with_press: true,
+                sound: null,
+                offset: 4,
+                collider: false
+            },
+            {
+                url: 'https://raw.githubusercontent.com/decentralize-dfw/c2w2-glb/main/frued-human-900-opt-v72.glb',
+                name: 'frued-human',
+                description: 'Model 3: frued-human',
+                position: { x: -15, y: 0, z: -15 },
+                rotation: { x: 0, y: 0, z: 0 },
+                scale: { x: 3, y: 3, z: 3 },
+                animate: true,
+                loop: true,
+                with_press: true,
+                sound: 'https://raw.githubusercontent.com/decentralize-dfw/c2w2runway/main/part3-clean-v3-2.mp3',
+                offset: 4,
+                collider: false
+            },
+            {
+                url: 'https://raw.githubusercontent.com/decentralize-dfw/c2w2-glb/main/squallo-900-opt-v101.glb',
+                name: 'squallo',
+                description: 'Model 4: squallo',
+                position: { x: 13, y: 1.2, z: -0.1 },
+                rotation: { x: 0, y: 180, z: 0 },
+                scale: { x: 3, y: 3, z: 3 },
+                animate: true,
+                loop: true,
+                with_press: true,
+                sound: null,
+                offset: 4,
+                collider: false
+            },
+            {
+                url: 'https://raw.githubusercontent.com/decentralize-dfw/c2w2-glb/main/bulkgelin-900-opt-v65.glb',
+                name: 'bulkgelin',
+                description: 'Model 5: bulkgelin',
+                position: { x: 0, y: 0, z: -20 },
+                rotation: { x: 0, y: 180, z: 0 },
+                scale: { x: 3, y: 3, z: 3 },
+                animate: true,
+                loop: true,
+                with_press: true,
+                sound: null,
+                offset: 4,
+                collider: false
+            }
+        ];
+        const models = [];
+        const audioLoader = new THREE.AudioLoader();
+        let bgBuffer, bgSound;
+        const bgUrl = 'https://raw.githubusercontent.com/decentralize-dfw/c2w2runway/main/part1-clean-v3-3-kiddo.mp3';
+        // Count total sounds
+        let totalSounds = 1; // background
+        modelConfigs.forEach(config => {
+            if (config.sound) totalSounds++;
+        });
+        const totalVisuals = modelConfigs.length + 1; // models + space
+        let loadedVisuals = 0;
+        let loadedSounds = 0;
+        const loadingText = document.getElementById('loading-text');
+        function updateLoadingProgress() {
+            const total = totalVisuals + totalSounds;
+            const loaded = loadedVisuals + loadedSounds;
+            const percent = (loaded / total * 100).toFixed(0);
+            loadingText.textContent = `Loading experience... ${percent}%`;
+        }
+        function checkAllLoaded() {
+            if (loadedVisuals === totalVisuals && loadedSounds === totalSounds) {
+                document.getElementById('loading').style.display = 'none';
+                controls.lock();
+            }
+        }
+        // Load background sound
+        function loadBackgroundSound() {
+            audioLoader.load(bgUrl, (buffer) => {
+                bgBuffer = buffer;
+                bgSound = new THREE.Audio(audioListener);
+                bgSound.setBuffer(bgBuffer);
+                bgSound.setLoop(true);
+                bgSound.setVolume(0.5);
+                bgSound.play();
+                console.log('Background sound started');
+                loadedSounds++;
+                updateLoadingProgress();
+                checkAllLoaded();
+            });
+        }
+        function degToRad(deg) {
+            return deg * (Math.PI / 180);
+        }
+        // Load main space
+        let spaceMeshes = [];
+        const spaceUrl = 'https://raw.githubusercontent.com/decentralize-dfw/vea_001/main/mm67-double-wood-as-opt.glb';
+        function loadSpace() {
+            gltfLoader.load(spaceUrl, (gltf) => {
+                const spaceModel = gltf.scene;
+                spaceModel.position.set(0, 0, 0);
+                spaceModel.traverse((child) => {
+                    if (child.isMesh) {
+                        child.castShadow = true;
+                        child.receiveShadow = true;
+                        if (child.geometry) child.geometry.computeBoundsTree();
+                        spaceMeshes.push(child);
+                    }
+                });
+                scene.add(spaceModel);
+                console.log('Space loaded!');
+                loadedVisuals++;
+                updateLoadingProgress();
+                checkAllLoaded();
+            }, undefined, (error) => {
+                console.error('Space loading error:', error);
+            });
+        }
+        // GLTF Loader
+        const dracoLoader = new DRACOLoader();
+        dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.7/');
+        dracoLoader.setDecoderConfig({ type: 'js' });
+        const gltfLoader = new GLTFLoader();
+        gltfLoader.setDRACOLoader(dracoLoader);
+        gltfLoader.setMeshoptDecoder(MeshoptDecoder);
+        function loadModel(config, index) {
+            gltfLoader.load(
+                config.url,
+                (gltf) => {
+                    const modelScene = gltf.scene;
+                    modelScene.position.set(config.position.x, config.position.y, config.position.z);
+                    modelScene.rotation.set(degToRad(config.rotation.x), degToRad(config.rotation.y), degToRad(config.rotation.z));
+                    modelScene.scale.set(config.scale.x, config.scale.y, config.scale.z);
+                    modelScene.traverse((child) => {
+                        if (child.isMesh) {
+                            child.castShadow = true;
+                            child.receiveShadow = true;
+                        }
+                    });
+                    scene.add(modelScene);
+                    let mixer = null;
+                    if (gltf.animations && gltf.animations.length > 0) {
+                        mixer = new THREE.AnimationMixer(modelScene);
+                        gltf.animations.forEach((clip) => {
+                            const action = mixer.clipAction(clip);
+                            action.loop = config.loop ? THREE.LoopRepeat : THREE.LoopOnce;
+                            if (!config.loop) action.clampWhenFinished = true;
+                        });
+                    }
+                    const box = new THREE.Box3().setFromObject(modelScene);
+                    box.expandByScalar(config.offset);
+                    const colliderBox = config.collider ? new THREE.Box3().setFromObject(modelScene) : null;
+                    const entry = {
+                        model: modelScene,
+                        mixer,
+                        config,
+                        box,
+                        colliderBox,
+                        inside: false,
+                        animated: false,
+                        sound: null,
+                        buffer: null,
+                        soundPlayed: false
+                    };
+                    if (config.sound) {
+                        audioLoader.load(config.sound, (buffer) => {
+                            entry.buffer = buffer;
+                            console.log(`Sound for model ${index} loaded`);
+                            loadedSounds++;
+                            updateLoadingProgress();
+                            checkAllLoaded();
+                        });
+                    }
+                    models[index] = entry;
+                    console.log(`Model ${index} loaded`);
+                    loadedVisuals++;
+                    updateLoadingProgress();
+                    checkAllLoaded();
+                },
+                undefined,
+                (error) => {
+                    console.error(`Model ${index} loading error:`, error);
+                }
+            );
+        }
+        function startAnimation(entry) {
+            if (entry.mixer && entry.mixer._actions.length > 0) {
+                entry.mixer.stopAllAction();
+                entry.mixer.time = 0;
+                entry.mixer.update(0);
+                entry.mixer._actions.forEach(action => {
+                    action.reset();
+                    action.paused = false;
+                    action.play();
+                });
+                entry.animated = true;
+                console.log(`Model ${entry.config.name} animation started`);
+            }
+            if (entry.config.sound) {
+                playModelSound(entry);
+            }
+        }
+        function pauseAnimation(entry) {
+            if (entry.mixer) {
+                entry.mixer._actions.forEach(action => {
+                    action.paused = true;
+                });
+                console.log(`Model ${entry.config.name} animation paused`);
+            }
+        }
+        function playModelSound(entry) {
+            if (entry.buffer && !entry.soundPlayed) {
+                const sound = new THREE.Audio(audioListener);
+                sound.setBuffer(entry.buffer);
+                sound.setLoop(false);
+                sound.setVolume(0.5);
+                sound.play();
+                entry.sound = sound;
+                entry.soundPlayed = true;
+                sound.onEnded = () => {
+                    entry.sound = null;
+                    entry.soundPlayed = false;
+                };
+                console.log(`Model ${entry.config.name} sound played`);
+            }
+        }
+        function stopModelSound(entry) {
+            if (entry.sound && entry.sound.isPlaying) {
+                entry.sound.stop();
+                entry.sound = null;
+                entry.soundPlayed = false;
+                console.log(`Model ${entry.config.name} sound stopped`);
+            }
+        }
+        // Realistic environment map (HDR)
+        const pmremGenerator = new THREE.PMREMGenerator(renderer);
+        pmremGenerator.compileEquirectangularShader();
+        function loadEnvironment() {
+            new RGBELoader().load('https://raw.githubusercontent.com/decentralize-dfw/vea_001/main/surreal_hdr.hdr', (texture) => {
+                const envMap = pmremGenerator.fromEquirectangular(texture).texture;
+                scene.environment = envMap;
+                scene.background = envMap;
+                texture.dispose();
+                pmremGenerator.dispose();
+            });
+        }
+        // Lights
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.1);
+        scene.add(ambientLight);
+        const hemisphereLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.2);
+        hemisphereLight.position.set(0, 20, 0);
+        scene.add(hemisphereLight);
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+        directionalLight.position.set(5, 15, 5);
+        directionalLight.castShadow = true;
+        directionalLight.shadow.mapSize.width = 2048;
+        directionalLight.shadow.mapSize.height = 2048;
+        directionalLight.shadow.camera.near = 0.5;
+        directionalLight.shadow.camera.far = 500;
+        directionalLight.shadow.camera.left = -50;
+        directionalLight.shadow.camera.right = 50;
+        directionalLight.shadow.camera.top = 50;
+        directionalLight.shadow.camera.bottom = -50;
+        directionalLight.shadow.bias = -0.0001;
+        directionalLight.shadow.normalBias = 0.05;
+        directionalLight.shadow.radius = 4;
+        directionalLight.shadow.blurSamples = 16;
+        scene.add(directionalLight);
+        const pointLight1 = new THREE.PointLight(0xffffff, 40, 50);
+        pointLight1.position.set(15, 10, 15);
+        pointLight1.castShadow = true;
+        pointLight1.shadow.mapSize.width = 1024;
+        pointLight1.shadow.mapSize.height = 1024;
+        pointLight1.shadow.camera.near = 0.1;
+        pointLight1.shadow.camera.far = 100;
+        pointLight1.shadow.bias = -0.005;
+        pointLight1.shadow.radius = 4;
+        scene.add(pointLight1);
+        const pointLight2 = new THREE.PointLight(0xffffff, 40, 50);
+        pointLight2.position.set(-15, 10, 15);
+        pointLight2.castShadow = true;
+        pointLight2.shadow.mapSize.width = 1024;
+        pointLight2.shadow.mapSize.height = 1024;
+        pointLight2.shadow.camera.near = 0.1;
+        pointLight2.shadow.camera.far = 100;
+        pointLight2.shadow.bias = -0.005;
+        pointLight2.shadow.radius = 4;
+        scene.add(pointLight2);
+        const pointLight3 = new THREE.PointLight(0xffffff, 40, 50);
+        pointLight3.position.set(15, 10, -15);
+        pointLight3.castShadow = true;
+        pointLight3.shadow.mapSize.width = 1024;
+        pointLight3.shadow.mapSize.height = 1024;
+        pointLight3.shadow.camera.near = 0.1;
+        pointLight3.shadow.camera.far = 100;
+        pointLight3.shadow.bias = -0.005;
+        pointLight3.shadow.radius = 4;
+        scene.add(pointLight3);
+        const pointLight4 = new THREE.PointLight(0xffffff, 40, 50);
+        pointLight4.position.set(-15, 10, -15);
+        pointLight4.castShadow = true;
+        pointLight4.shadow.mapSize.width = 1024;
+        pointLight4.shadow.mapSize.height = 1024;
+        pointLight4.shadow.camera.near = 0.1;
+        pointLight4.shadow.camera.far = 100;
+        pointLight4.shadow.bias = -0.005;
+        pointLight4.shadow.radius = 4;
+        scene.add(pointLight4);
+        // Initiate button
+        const initiateButton = document.getElementById('initiate');
+        initiateButton.addEventListener('click', () => {
+            initiateButton.style.display = 'none';
+            document.querySelector('#loading .spinner').style.display = 'block';
+            document.getElementById('loading-text').style.display = 'block';
+            // Start loading everything
+            loadEnvironment();
+            loadBackgroundSound();
+            loadSpace();
+            modelConfigs.forEach((config, index) => {
+                loadModel(config, index);
+            });
+        });
+        // Full screen button
+        const fullscreenButton = document.getElementById('fullscreenButton');
+        fullscreenButton.addEventListener('click', () => {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().then(() => {
+                    fullscreenButton.textContent = 'Exit Fullscreen';
+                    controls.lock();
+                }).catch(err => {
+                    console.error('Fullscreen error:', err);
+                });
+            } else {
+                document.exitFullscreen().then(() => {
+                    fullscreenButton.textContent = 'Full Screen';
+                }).catch(err => {
+                    console.error('Exit fullscreen error:', err);
+                });
+            }
+        });
+        document.addEventListener('fullscreenchange', () => {
+            if (document.fullscreenElement) {
+                fullscreenButton.textContent = 'Exit Fullscreen';
+            } else {
+                fullscreenButton.textContent = 'Full Screen';
+            }
+        });
+        // Camera starting position
+        camera.position.set(15, 1.8, 0);
+        camera.lookAt(0, 0, 0);
+        const clock = new THREE.Clock();
+        const raycaster = new THREE.Raycaster();
+        const tempVec = new THREE.Vector3();
+        const forwardVec = new THREE.Vector3();
+        const rightVec = new THREE.Vector3();
+        const playerRadius = 0.3; // Increased for smoother movement
+        const eyeHeight = 1.6;
+        const playerHeight = 1.8;
+        const headClearance = playerHeight - eyeHeight;
+        function moveHorizontal(delta) {
+            // Get camera directions
+            camera.getWorldDirection(forwardVec);
+            forwardVec.y = 0;
+            forwardVec.normalize();
+            rightVec.crossVectors(forwardVec, camera.up).normalize();
+            let moveDelta = new THREE.Vector3(0, 0, 0);
+            if (keys.forward) moveDelta.add(forwardVec.clone().multiplyScalar(currentMoveSpeed * delta));
+            if (keys.backward) moveDelta.add(forwardVec.clone().multiplyScalar(-currentMoveSpeed * delta));
+            if (keys.left) moveDelta.add(rightVec.clone().multiplyScalar(-currentMoveSpeed * delta));
+            if (keys.right) moveDelta.add(rightVec.clone().multiplyScalar(currentMoveSpeed * delta));
+            if (moveDelta.lengthSq() === 0) return;
+            const moveDir = moveDelta.clone().normalize();
+            const moveDist = moveDelta.length();
+            // Perp vec for width
+            const up = new THREE.Vector3(0, 1, 0);
+            const perpVec = new THREE.Vector3().crossVectors(moveDir, up).normalize();
+            // Offsets for width
+            const offsets = [
+                new THREE.Vector3(0, 0, 0),
+                perpVec.clone().multiplyScalar(playerRadius),
+                perpVec.clone().multiplyScalar(-playerRadius)
+            ];
+            // Heights relative to camera (eye height), covering from bottom to top
+            const heights = [ -eyeHeight + 0.01, 0, headClearance - 0.01 ]; // Reduced for potential smoothness
+            let collides = false;
+            for (let offset of offsets) {
+                for (let h of heights) {
+                    const origin = camera.position.clone().add(offset);
+                    origin.y += h;
+                    raycaster.set(origin, moveDir);
+                    raycaster.far = moveDist + playerRadius;
+                    const intersects = raycaster.intersectObjects(spaceMeshes);
+                    if (intersects.length > 0 && intersects[0].distance <= moveDist) { // Changed to <= for stricter
+                        collides = true;
+                        break;
+                    }
+                }
+                if (collides) break;
+            }
+            if (!collides) {
+                // Check model box colliders with player size
+                tempVec.copy(camera.position).add(moveDelta);
+                let modelCollides = false;
+                for (let entry of models) {
+                    if (entry.colliderBox) {
+                        const expandedBox = entry.colliderBox.clone().expandByScalar(playerRadius);
+                        if (expandedBox.containsPoint(tempVec)) {
+                            modelCollides = true;
+                            break;
+                        }
+                    }
+                }
+                if (!modelCollides) {
+                    camera.position.add(moveDelta);
+                }
+            }
+        }
+        function applyGravityAndFloorCollision(delta) {
+            velocity.y -= gravity * delta;
+            const dy = velocity.y * delta;
+            // Floor collision
+            if (velocity.y < 0) {
+                const offsets = [
+                    new THREE.Vector3(0, 0, 0),
+                    new THREE.Vector3(playerRadius, 0, 0),
+                    new THREE.Vector3(-playerRadius, 0, 0),
+                    new THREE.Vector3(0, 0, playerRadius),
+                    new THREE.Vector3(0, 0, -playerRadius)
+                ];
+                let maxFloorY = -Infinity;
+                for (let offset of offsets) {
+                    const origin = camera.position.clone().add(offset);
+                    origin.y += 0.1; // slight offset above current
+                    raycaster.set(origin, new THREE.Vector3(0, -1, 0));
+                    raycaster.far = eyeHeight + 0.1 - dy; // look down to possible fall distance
+                    const intersects = raycaster.intersectObjects(spaceMeshes);
+                    if (intersects.length > 0) {
+                        const floorY = intersects[0].point.y;
+                        if (floorY > maxFloorY) maxFloorY = floorY;
+                    }
+                }
+                if (maxFloorY > -Infinity && camera.position.y + dy <= maxFloorY + eyeHeight) {
+                    camera.position.y = maxFloorY + eyeHeight;
+                    velocity.y = 0;
+                    onFloor = true;
+                    return;
+                }
+            }
+            // Ceiling collision
+            if (velocity.y > 0) {
+                const offsets = [
+                    new THREE.Vector3(0, 0, 0),
+                    new THREE.Vector3(playerRadius, 0, 0),
+                    new THREE.Vector3(-playerRadius, 0, 0),
+                    new THREE.Vector3(0, 0, playerRadius),
+                    new THREE.Vector3(0, 0, -playerRadius)
+                ];
+                let minCeilingY = Infinity;
+                for (let offset of offsets) {
+                    const origin = camera.position.clone().add(offset);
+                    origin.y -= 0.1; // slight offset below head
+                    raycaster.set(origin, new THREE.Vector3(0, 1, 0));
+                    raycaster.far = headClearance + 0.1 + dy;
+                    const intersects = raycaster.intersectObjects(spaceMeshes);
+                    if (intersects.length > 0) {
+                        const ceilingY = intersects[0].point.y;
+                        if (ceilingY < minCeilingY) minCeilingY = ceilingY;
+                    }
+                }
+                if (minCeilingY < Infinity && camera.position.y + dy >= minCeilingY - headClearance) {
+                    camera.position.y = minCeilingY - headClearance;
+                    velocity.y = 0;
+                    return;
+                }
+            }
+            camera.position.y += dy;
+        }
+        let currentAnimateEntry = null;
+        function animate() {
+            requestAnimationFrame(animate);
+            if (controls.isLocked) {
+                const time = performance.now();
+                const delta = (time - prevTime) / 1000;
+                prevTime = time;
+                if (keys.jump && onFloor) {
+                    velocity.y = jumpVelocity;
+                    onFloor = false;
+                }
+                // Horizontal movement with collision
+                moveHorizontal(delta);
+                // Apply gravity and vertical collision
+                applyGravityAndFloorCollision(delta);
+                if (camera.position.y < -100) { // Safety net
+                    camera.position.y = eyeHeight;
+                    velocity.y = 0;
+                    onFloor = true;
+                }
+            }
+            // Check models
+            document.getElementById('description').style.display = 'none';
+            animatePrompt.style.display = 'none';
+            currentAnimateEntry = null;
+            models.forEach((entry) => {
+                if (entry) {
+                    const nowInside = entry.box.containsPoint(camera.position);
+                    if (nowInside && !entry.inside) {
+                        entry.soundPlayed = false;
+                        if (entry.config.animate && !entry.config.with_press) {
+                            startAnimation(entry);
+                        } else if (entry.config.animate && entry.config.with_press) {
+                            entry.animated = false;
+                        }
+                    } else if (!nowInside && entry.inside) {
+                        stopModelSound(entry);
+                    }
+                    if (nowInside) {
+                        // Check if looking at the model
+                        raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+                        const intersects = raycaster.intersectObject(entry.model, true);
+                        if (intersects.length > 0) {
+                            document.getElementById('description').textContent = entry.config.description;
+                            document.getElementById('description').style.display = 'block';
+                            if (entry.config.animate && entry.config.with_press && !entry.animated) {
+                                animatePrompt.style.display = 'block';
+                                currentAnimateEntry = entry;
+                            }
+                        }
+                    } else {
+                        if (entry.animated) {
+                            pauseAnimation(entry);
+                            entry.animated = false;
+                        }
+                    }
+                    entry.inside = nowInside;
+                    if (entry.mixer && entry.animated) {
+                        entry.mixer.update(clock.getDelta());
+                    }
+                }
+            });
+            // Check for E press
+            if (animateKeyPressed && currentAnimateEntry && !currentAnimateEntry.animated) {
+                startAnimation(currentAnimateEntry);
+                if (currentAnimateEntry.config.loop) {
+                    animatePrompt.style.display = 'none';
+                }
+                animateKeyPressed = false; // Prevent continuous trigger
+            }
+            composer.render();
+        }
+        animate();
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            composer.setSize(window.innerWidth, window.innerHeight);
+            ssaoPass.setSize(window.innerWidth, window.innerHeight);
+            bloomPass.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>  // aiming to model should be able inside of the whole offset, neden dibine girmem gerkeiyor ya? sıfırına inmem gerekiyor? o alanın içindeyken ne zaman kameram modelin kendi bounding boxuna dönse E to animate i görmem gereiyor. zone un içindeyken haydi kankam benim
