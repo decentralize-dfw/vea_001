@@ -1,0 +1,47 @@
+bu kodu editlemeni istiyorum. 
+öncelikle.
+iframe modunu kaldır, web versiyonuyla ilgileniyoruz şuan, desktop versiyonuyla, 
+vr modu şimdilik kalsın, olduğu gibi onda çeşitli değişiklikler yapabileceğiz, 
+model url de her bir modelin konumunu koyabilmeliyiz. 
+ikinci olarak, await load model falan var ya
+onda kameraları da aktive edebilme gerekiyor, 
+ve start tuşu sol altta.
+bu ortada tek bir modelin döndüğü bir arayüz ya 30 saniye arayla, 
+bunu editleyeceğiz, her bir model loopta ilerlemelidir, 
+ve bir model geldiği zaman, modeller arasında toggle yapabilmeliyiz. mesela 10 tane scene olucak, her bir scene için de 3 faklı model kullanacağız, üstte 1, 2, 3 yazıcak, o bir iki ve üçler isim sahibi olucak, bilmemne versiyonu, bilmemne versiyonu bilmemne versiyonu gibi.
+yani 30 saniye ilerlemeyi, şuan start tuşu var ya onunla yapacağız. her start a basıldığında bir sonraki state e geçmelidir. 
+ayrıca
+her bir state için, sol tarafta ve sağ tarafta 300pxl genişliğinde ve 600 pxl uzunluğunda gösterilebilinir html olmalıdır. mesela model 1 var ya
+html 11, ve html12 ona çalışmalıdır. 
+öte yandan, mesela html 32 null yaptım. model üçte html21 i -random bu sayılarfunctionu anlatıyorum sana- kullaniblmeliyim.
+walkthru modu açık kalsın. 
+şidmi varolan modelleri sırasıyla şöyle kullan.
+model 1 model2 model 3 -scene 1 de 
+konumları 10,10,0. rotation 0,0,0 scale 1,1,1.
+camera 1 ise, 10,10 konumunda, 1.6 yüksekliğinde olup etrafa 360 görebilmelidir. 
+
+model 4 model5 model 6 -scene 2 de 
+konumları 10,-10,0. rotation 0,0,0 scale 1,1,1.
+camera 2 ise, 10,-10 konumunda, 1.6 yüksekliğinde olup etrafa 360 görebilmelidir. 
+
+model 7 model8 model 9 -scene 3 de 
+konumları -10,10,0. rotation 0,0,0 scale 1,1,1.
+camera 3 ise, -10,10 konumunda, 1.6 yüksekliğinde olup etrafa 360 görebilmelidir. 
+
+model 10 model11 model 12 -scene 1 de 
+konumları -10,-10,0. rotation 0,0,0 scale 1,1,1.
+camera 4 ise, -10,-10 konumunda, 1.6 yüksekliğinde olup etrafa 360 görebilmelidir. 
+
+mesela start dendi scene 1i yükle. yani model 4ü. model 5 ve 6 toggle gibi çalışmlaıdır. şuanki iframedeki kamera ayarlarını desktopa uyarla, lens tuşunu da kaldır. eski kamera tuşları model toggle olarak çalışmalıdır. 
+
+start a bastım bir daha, scene 1i sil, scene 2 camerasına gel, ve scene 2 ki ilk modeli yükle. 
+
+böyle git scene 4 ün sonuna kadar.
+sonra scene 4 sunuda, walkthru modunu aç. 
+bu modda, model 1i yükle. ama 0,0,0 a yükle. o konumu değiştirebiliyor olmam lazım koddan. 
+üstteki toggle bu sefer, scene 1, 2,3 ve 4 olmalıdır. ordan seçtiğimde, mesela final walkthru mode desin kodda: 
+load scene 1: load model 2, şu konumda şu rotasyon ve scale de
+load scene 2: load model 5
+falan gibi en son toggle da scene ler arasın istediğiim i seçebilmeliyim. ve yazabilmeliyim kodda hangisi nerede olacak. 
+
+
