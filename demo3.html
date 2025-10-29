@@ -1,0 +1,1495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>C2W2 VIRTUAL RUNWAY BY DFW</title>
+
+    <style>
+        :root {
+            --fg: #fff;
+            --bg: #000;
+            --muted: #9aa0a6;
+            --accent: #e5e5e5;
+            --panel: rgba(0, 0, 0, .55);
+            --panelBlur: 8px;
+        }
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            color: var(--fg);
+            background: var(--bg);
+            font-family: Helvetica, Arial, sans-serif;
+            cursor: pointer; /* Fare imlecini her zaman tıklanabilir göster */
+        }
+
+        canvas {
+            display: block;
+        }
+
+        .panel {
+            position: fixed;
+            backdrop-filter: blur(var(--panelBlur));
+            background: var(--panel);
+            border: 1px solid rgba(255, 255, 255, .08);
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, .25);
+            z-index: 10;
+        }
+
+        #loading {
+            position: fixed;
+            inset: 0;
+            display: flex; /* Varsayılan olarak flex */
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 0, 0, 0.8); /* Arka planı hafif şeffaf yapalım */
+            color: white;
+            z-index: 1000;
+            font-size: 24px;
+            /* Başlangıçta gizli olsun, sadece yükleme sırasında görünsün */
+            /* display: none; */
+        }
+
+        #loading img { /* Loading içindeki resim stili kaldırıldı, sadece yazı gösterilecek */
+           display:none;
+        }
+        #sceneLoadingIndicator { /* Sahne içi yükleme göstergesi */
+             position: fixed;
+             top: 50%;
+             left: 50%;
+             transform: translate(-50%, -50%);
+             background: rgba(0,0,0,0.7);
+             color: white;
+             padding: 15px 25px;
+             border-radius: 10px;
+             font-size: 18px;
+             z-index: 1001; /* Loading'in üzerinde */
+             display: none; /* Başlangıçta gizli */
+        }
+
+
+        #backgroundImg {
+            position: fixed;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            filter: brightness(1);
+            z-index: 5;
+            display: none;
+        }
+
+        #instructions {
+            font-family: Helvetica, Arial, sans-serif;
+            inset: auto;
+            top: 15%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            padding: 8px 12px;
+            display: none;
+            z-index: 15;
+            pointer-events: none; /* Üzerine tıklanmasını engelle */
+        }
+
+        #instructions h1 {
+            margin: 0 0 8px 0;
+            font-size: 17px;
+            font-weight: 700;
+        }
+
+        #instructions h2 {
+            margin: 0 0 8px 0;
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        #instructions p {
+            margin: 4px 0;
+            font-size: 9px;
+            color: var(--accent);
+        }
+
+        /* Resume butonu kaldırıldı */
+        /* #resume { ... } */
+
+        #VRButton {
+            position: fixed;
+            backdrop-filter: blur(var(--panelBlur));
+            background: var(--panel);
+            border: 2px solid rgba(255, 255, 255, .3);
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, .25);
+            z-index: 15;
+            inset: auto;
+            top: 15%;
+            left: 40%;
+            width: 20%;
+            transform: translate(0, -50%);
+            text-align: center;
+            padding: 8px 12px;
+            font-family: Helvetica, Arial, sans-serif;
+            font-size: 17px;
+            font-weight: 700;
+            color: var(--fg);
+            cursor: pointer;
+            overflow: hidden;
+            max-height: 40px;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+            line-height: 24px;
+            transition: border-color 0.3s ease;
+        }
+
+        #VRButton:hover {
+            border-color: rgba(255, 255, 255, .6);
+        }
+
+        #initiating {
+            position: absolute;
+            top: 20%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            backdrop-filter: blur(8px);
+            background: rgba(0, 0, 0, .55);
+            border: 1px solid rgba(255, 255, 255, .08);
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, .25);
+            z-index: 10;
+            padding: 8px 12px;
+            color: #fff;
+            font-size: 15px;
+            font-weight: 400;
+            text-align: center;
+            margin: 0;
+            font-family: Helvetica, Arial, sans-serif;
+            display: none;
+        }
+
+        #ended {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            backdrop-filter: blur(8px);
+            background: rgba(0, 0, 0, .55);
+            border: 1px solid rgba(255, 255, 255, .08);
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, .25);
+            z-index: 10;
+            padding: 12px 12px;
+            color: #fff;
+            font-size: 20px;
+            font-weight: 700;
+            text-align: center;
+            margin: 0;
+            font-family: Helvetica, Arial, sans-serif;
+            display: none;
+        }
+
+        #description {
+            position: absolute;
+            letter-spacing: -1px;
+            bottom: 12px;
+            left: 50px;
+            right: 50px;
+            color: rgba(255, 255, 255, 1);
+            font-size: 15px;
+            font-family: Helvetica;
+            font-weight: 800;
+            text-align: center;
+            display: none;
+        }
+
+        #hoverText {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            backdrop-filter: blur(8px);
+            background: rgba(0, 0, 0, .55);
+            border: 1px solid rgba(255, 255, 255, .08);
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, .25);
+            z-index: 10;
+            padding: 8px 12px;
+            color: #fff;
+            font-size: 12px;
+            font-weight: 500;
+            text-align: center;
+            display: none;
+        }
+        
+        /* --- YENİ HTML PANELLERİ --- */
+        #leftHtmlPanel, #rightHtmlPanel {
+            position: fixed;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 300px;
+            height: 600px;
+            backdrop-filter: blur(var(--panelBlur));
+            background: var(--panel);
+            border: 1px solid rgba(255, 255, 255, .08);
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, .25);
+            z-index: 20;
+            padding: 20px;
+            color: #fff;
+            font-size: 14px;
+            font-weight: 400;
+            text-align: left;
+            display: none; /* Başlangıçta gizli */
+            overflow-y: auto;
+            box-sizing: border-box;
+        }
+
+        #leftHtmlPanel {
+            left: 20px;
+        }
+
+        #rightHtmlPanel {
+            right: 20px;
+        }
+        
+        #leftHtmlPanel::-webkit-scrollbar, #rightHtmlPanel::-webkit-scrollbar {
+            width: 3px;
+        }
+        #leftHtmlPanel::-webkit-scrollbar-thumb, #rightHtmlPanel::-webkit-scrollbar-thumb {
+            background: rgba(255,255,255,0.5);
+            border-radius: 3px;
+        }
+        #leftHtmlPanel::-webkit-scrollbar-track, #rightHtmlPanel::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        /* --- HTML Panel Stilleri Bitiş --- */
+
+
+        #projectInfoPanel, #studioInfoPanel, #hintPanel, #creatorsNotePanel {
+            font-style: normal;
+            position: fixed;
+            top: 70px;
+            right: 10px;
+            width: 375px;
+            height: 750px;
+            backdrop-filter: blur(8px);
+            background: rgba(0, 0, 0, .55);
+            border: 1px solid rgba(255, 255, 255, .08);
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, .25);
+            z-index: 20;
+            padding: 10px;
+            color: #fff;
+            font-size: 14px;
+            font-weight: 400;
+            text-align: left;
+            display: none;
+            overflow-y: auto;
+            box-sizing: border-box;
+        }
+
+        #projectInfoPanel::-webkit-scrollbar, #studioInfoPanel::-webkit-scrollbar, #hintPanel::-webkit-scrollbar, #creatorsNotePanel::-webkit-scrollbar {
+            width: 1px;
+            background: transparent;
+        }
+
+        #projectInfoPanel::-webkit-scrollbar-thumb, #studioInfoPanel::-webkit-scrollbar-thumb, #hintPanel::-webkit-scrollbar-thumb, #creatorsNotePanel::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.5);
+            border-radius: 0.5px;
+        }
+
+        #projectInfoPanel::-webkit-scrollbar-track, #studioInfoPanel::-webkit-scrollbar-track, #hintPanel::-webkit-scrollbar-track, #creatorsNotePanel::-webkit-scrollbar-track {
+            background: transparent;
+            margin: 5px 0;
+        }
+
+        #closeButton, #studioCloseButton, #hintCloseButton, #creatorsCloseButton {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: none;
+            border: none;
+            color: #fff;
+            font-size: 20px;
+            cursor: pointer;
+        }
+
+        #projectInfoPanel p, #studioInfoPanel p, #hintPanel p, #creatorsNotePanel p {
+            margin: 10px 0;
+            text-align: justify;
+            text-align-last: left;
+            hyphens: auto;
+            -webkit-hyphens: auto;
+            -ms-hyphens: auto;
+        }
+
+        #projectInfoPanel i, #studioInfoPanel i, #hintPanel i, #creatorsNotePanel i {
+            font-size: 11px !important;
+            font-weight: 400;
+            line-height: 1.4;
+            font-style: italic;
+            text-align: justify;
+            text-align-last: left;
+            -webkit-hyphens: auto;
+            -ms-hyphens: auto;
+        }
+
+        #projectInfoPanel i strong, #studioInfoPanel i strong, #hintPanel i strong, #creatorsNotePanel i strong {
+            font-size: 13px !important;
+            font-weight: 700;
+            display: inline-block;
+            margin-bottom: 12px;
+        }
+
+        #projectInfoPanel a, #studioInfoPanel a, #hintPanel a, #creatorsNotePanel a {
+            color: #b1c2fa;
+            text-decoration: underline;
+        }
+
+        .selected {
+            background: rgba(255, 255, 255, 0.4) !important;
+            border-color: rgba(255, 255, 255, 0.5) !important;
+        }
+    </style>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.158.0/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+<body>
+    <div id="loading">Loading Base Scene...</div> <!-- Başlangıç mesajı -->
+    <div id="sceneLoadingIndicator">Loading Scene Models...</div> <!-- Sahne içi yükleme göstergesi -->
+
+    <img id="backgroundImg" src="https://arweave.net/6mlLJopDhUjuA3a47_7coCxMhpwO5kOSh1pLvpCznbQ">
+    
+    <div id="instructions" class="panel">
+        <h1>Click to Enter</h1>
+    </div>
+    
+    <div id="initiating">Initializing...</div>
+    <div id="ended">Experience Ended</div>
+    
+    <button id="startButton" style="position: absolute; left: 10px; bottom: 10px; backdrop-filter: blur(8px); background: rgba(0,0,0,.55); border: 1px solid rgba(255,255,255,.08); border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.25); z-index: 10; padding: 8px 12px; color: #fff; font-size: 15px; font-weight: 700; text-align: center; margin: 0; font-family: Helvetica, Arial, sans-serif; display: none;">Start</button>
+
+    <!-- Model Toggle Butonları -->
+    <p id="modelLabel" style="position: absolute; left: 10px; top: 10px; color: white; font-size: 12px; font-weight: 500; text-align: left; margin: 0; font-family: Helvetica, Arial, sans-serif; display: none;">Model</p>
+    <button id="modelToggleBtn1" style="position: absolute; left: 60px; top: 9px; backdrop-filter: blur(8px); background: rgba(0,0,0,.55); border: 1px solid rgba(255,255,255,.08); border-radius: 4px; box-shadow: 0 10px 30px rgba(0,0,0,.25); z-index: 10; padding: 4px 8px; color: #fff; font-size: 11px; font-weight: 500; text-align: center; margin: 0; font-family: Helvetica, Arial, sans-serif; display: none;">Model 1</button>
+    <button id="modelToggleBtn2" style="position: absolute; left: 120px; top: 9px; backdrop-filter: blur(8px); background: rgba(0,0,0,.55); border: 1px solid rgba(255,255,255,.08); border-radius: 4px; box-shadow: 0 10px 30px rgba(0,0,0,.25); z-index: 10; padding: 4px 8px; color: #fff; font-size: 11px; font-weight: 500; text-align: center; margin: 0; font-family: Helvetica, Arial, sans-serif; display: none;">Model 2</button>
+    <button id="modelToggleBtn3" style="position: absolute; left: 180px; top: 9px; backdrop-filter: blur(8px); background: rgba(0,0,0,.55); border: 1px solid rgba(255,255,255,.08); border-radius: 4px; box-shadow: 0 10px 30px rgba(0,0,0,.25); z-index: 10; padding: 4px 8px; color: #fff; font-size: 11px; font-weight: 500; text-align: center; margin: 0; font-family: Helvetica, Arial, sans-serif; display: none;">Model 3</button>
+    <button id="modelToggleBtn4" style="position: absolute; left: 240px; top: 9px; backdrop-filter: blur(8px); background: rgba(0,0,0,.55); border: 1px solid rgba(255,255,255,.08); border-radius: 4px; box-shadow: 0 10px 30px rgba(0,0,0,.25); z-index: 10; padding: 4px 8px; color: #fff; font-size: 11px; font-weight: 500; text-align: center; margin: 0; font-family: Helvetica, Arial, sans-serif; display: none;">Scene 4</button>
+
+
+    <button id="fullscreenButton" style="position: absolute; right: 400px; top: 10px; backdrop-filter: blur(8px); background: rgba(0,0,0,.55); border: 1px solid rgba(255,255,255,.08); border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.25); z-index: 10; padding: 8px 12px; color: #fff; font-size: 12px; font-weight: 500; text-align: center; margin: 0; font-family: Helvetica, Arial, sans-serif;">Full Screen</button>
+    <button id="projectInfoButton" style="position: absolute; right: 300px; top: 10px; backdrop-filter: blur(8px); background: rgba(0,0,0,.55); border: 1px solid rgba(255,255,255,.08); border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.25); z-index: 10; padding: 8px 12px; color: #fff; font-size: 12px; font-weight: 500; text-align: center; margin: 0; font-family: Helvetica, Arial, sans-serif;">Project Info</button>
+    <button id="studioInfoButton" style="position: absolute; right: 200px; top: 10px; backdrop-filter: blur(8px); background: rgba(0,0,0,.55); border: 1px solid rgba(255,255,255,.08); border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.25); z-index: 10; padding: 8px 12px; color: #fff; font-size: 12px; font-weight: 500; text-align: center; margin: 0; font-family: Helvetica, Arial, sans-serif;">Studio Info</button>
+    <button id="hintButton" style="position: absolute; right: 10px; top: 10px; backdrop-filter: blur(8px); background: rgba(0,0,0,.55); border: 1px solid rgba(255,255,255,.08); border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.25); z-index: 10; padding: 8px 12px; color: #fff; font-size: 12px; font-weight: 500; text-align: center; margin: 0; font-family: Helvetica, Arial, sans-serif;">Hint</button>
+    <button id="creatorsNoteButton" style="position: absolute; right: 80px; top: 10px; backdrop-filter: blur(8px); background: rgba(0,0,0,.55); border: 1px solid rgba(255,255,255,.08); border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.25); z-index: 10; padding: 8px 12px; color: #fff; font-size: 12px; font-weight: 500; text-align: center; margin: 0; font-family: Helvetica, Arial, sans-serif;">Creators Note</button>
+    
+    <div id="description"></div>
+    <div id="hoverText">Click to open link</div>
+    
+    <!-- Sol ve Sağ HTML Panelleri -->
+    <div id="leftHtmlPanel"></div>
+    <div id="rightHtmlPanel"></div>
+
+    <!-- Tüm HTML içerikleri için görünmez depo -->
+    <div id="htmlContentStore" style="display: none;">
+        <div id="html_scene1_model1_left">
+            <h3>Sahne 1 / Model 1</h3>
+            <p>Bu, Sahne 1, Model 1 (Ara Sokak 1) için sol panel içeriğidir.</p>
+        </div>
+        <div id="html_scene1_model1_right">
+            <h3>Detaylar (1-1)</h3>
+            <p>Bu, Sahne 1, Model 1 için sağ panel içeriğidir.</p>
+        </div>
+        
+        <div id="html_scene1_model2_left">
+            <h3>Sahne 1 / Model 2</h3>
+            <p>Bu, Sahne 1, Model 2 (Dalaga Koridor) için sol panel içeriğidir.</p>
+        </div>
+        <!-- ... Diğer HTML içerikleri ... -->
+    </div>
+
+
+    <!-- Info Panelleri (içerikleri aynı) -->
+    <div id="projectInfoPanel">
+        <button id="closeButton">X</button>
+        <p><strong>Concept Summary:</strong><br><br>
+            Humanity evolves from touch to clicks...
+        </p>
+        <!-- ... -->
+    </div>
+    <div id="studioInfoPanel">
+        <button id="studioCloseButton">X</button>
+        <i><strong>Digital Forgery Workshop</strong></i><br><br>
+        <p><strong>CREATIVE DESIGN STUDIO...</strong><br><br>
+            Digital Forgery Workshop is a design practice...
+        </p>
+        <!-- ... -->
+    </div>
+    <div id="hintPanel">
+        <button id="hintCloseButton">X</button>
+        <p><strong>Hints</strong><br><br><br>
+            <p><strong>Navigation: Use W, A, S, D to move around... (only in Walk-thru mode).</strong><br>Click F for fullscreen.<br><br><br>
+            <p><strong>Links</strong><br>
+                <a href="https://manifold.xyz/@dfw/contract/166699248/1" target="_blank">Manifold</a> → Minted Experience<br>
+                <!-- ... -->
+            </p>
+            <!-- ... -->
+    </div>
+    <div id="creatorsNotePanel">
+        <button id="creatorsCloseButton">X</button>
+        <p><strong>C2W2 Virtual Runway, 2025</strong><br><br>
+            For 60+ VRM avatars...<br><br>
+            Redefining Digital Art...</p><i><a href="https://youtu.be/nyEjJ9KvnQc" target="_blank">Listen it here.</a></i>
+        <!-- ... -->
+    </div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+        import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+        import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+        import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
+        import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
+        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+        import { VRButton } from 'three/addons/webxr/VRButton.js';
+        import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
+        // PMREMGenerator importu eklenmeli
+        import { PMREMGenerator } from 'three'; 
+
+        // --- GLOBAL VARIABLES ---
+        let scene, camera, renderer, composer, controls;
+        let playerRig, bloomPass, audioListener;
+        let vrControlsActive = false;
+        let vrControllers = [];
+        let experienceRunning = false;
+        let bootShown = false;
+        let clock = new THREE.Clock();
+        let pmremGenerator; // PMREMGenerator için değişken
+
+        // --- STATE MANAGEMENT ---
+        let currentSceneIndex = -1;
+        let currentModelVariantIndex = -1; 
+        let walkthruMode = false;
+        let currentSceneModels = []; 
+
+        // --- DOM ELEMENTS ---
+        const loadingEl = document.getElementById('loading');
+        const sceneLoadingIndicatorEl = document.getElementById('sceneLoadingIndicator'); 
+        const backgroundImgEl = document.getElementById('backgroundImg');
+        const instructionsEl = document.getElementById('instructions');
+        const startButtonEl = document.getElementById('startButton');
+        const modelLabelEl = document.getElementById('modelLabel');
+        const modelToggleButtons = [
+            document.getElementById('modelToggleBtn1'),
+            document.getElementById('modelToggleBtn2'),
+            document.getElementById('modelToggleBtn3'),
+            document.getElementById('modelToggleBtn4')
+        ];
+        const leftHtmlPanel = document.getElementById('leftHtmlPanel');
+        const rightHtmlPanel = document.getElementById('rightHtmlPanel');
+        const descriptionEl = document.getElementById('description');
+
+        // --- MODEL URL'LERİ (Güncellendi) ---
+        const modelUrls = [
+            'https://raw.githubusercontent.com/decentralize-dfw/vea-randomfiles/main/ARASOKAK1.glb', // Model 1
+            'https://raw.githubusercontent.com/decentralize-dfw/vea-randomfiles/main/DALAGAKORİDOR.glb', // Model 2
+            'https://raw.githubusercontent.com/decentralize-dfw/vea-randomfiles/main/GARAJ1.glb', // Model 3
+            'https://raw.githubusercontent.com/decentralize-dfw/vea-randomfiles/main/INTERIOR21.glb', // Model 4
+            'https://raw.githubusercontent.com/decentralize-dfw/vea-randomfiles/main/INTERIOR3.glb', // Model 5
+            'https://raw.githubusercontent.com/decentralize-dfw/vea-randomfiles/main/taverna-opt.glb', // Model 6
+            'https://raw.githubusercontent.com/decentralize-dfw/vea-randomfiles/main/TUALET1.glb', // Model 7
+            'https://raw.githubusercontent.com/decentralize-dfw/vea-randomfiles/main/TUALET2.glb', // Model 8
+            'https://raw.githubusercontent.com/decentralize-dfw/vea-randomfiles/main/TUALET3.glb', // Model 9
+            'https://raw.githubusercontent.com/decentralize-dfw/vea-randomfiles/main/METROKANKİ.glb', // Model 10
+            'https://raw.githubusercontent.com/decentralize-dfw/vea-randomfiles/main/ARASOKAK1.glb', // Model 1 yeniden 11
+            'https://raw.githubusercontent.com/decentralize-dfw/vea-randomfiles/main/DALAGAKORİDOR.glb', // Model 2 yeniden 12
+        ];
+        
+        const modelDescriptions = [
+             'Ara Sokak 1', 'Dalaga Koridor', 'Garaj 1', 'Interior 21',
+             'Interior 3', 'Taverna', 'Tuvalet 1', 'Tuvalet 2',
+             'Tuvalet 3', 'Metro Kanki', 'Ara Sokak 1 (Tekrar)', 'Dalaga Koridor (Tekrar)',
+        ];
+
+        // --- YENİ SAHNE KONFİGÜRASYONU ---
+        const sceneConfiguration = {
+            scenes: [
+                { // Scene 1 (Index 0)
+                    cameraPos: { x: 10, y: 1.6, z: 10 }, 
+                    cameraLookAt: { x: 10, y: 1.6, z: 0 }, 
+                    variants: [
+                        { name: "Model 1", url: modelUrls[0], pos: { x: 10, y: 1.5, z: 10 }, rot: { x: 0, y: 0, z: 0 }, scale: { x: 1, y: 1, z: 1 }, htmlLeft: "html_scene1_model1_left", htmlRight: "html_scene1_model1_right", desc: modelDescriptions[0] },
+                        { name: "Model 2", url: modelUrls[1], pos: { x: 10, y: 0, z: 10 }, rot: { x: 0, y: 0, z: 0 }, scale: { x: 1, y: 1, z: 1 }, htmlLeft: "html_scene1_model2_left", htmlRight: null, desc: modelDescriptions[1] },
+                        { name: "Model 3", url: modelUrls[2], pos: { x: 10, y: 0, z: 10 }, rot: { x: 0, y: 0, z: 0 }, scale: { x: 1, y: 1, z: 1 }, htmlLeft: "html_scene1_model3_left", htmlRight: "html_scene1_model3_right", desc: modelDescriptions[2] }
+                    ]
+                },
+                { // Scene 2 (Index 1)
+                    cameraPos: { x: 10, y: 1.6, z: -10 },
+                    cameraLookAt: { x: 10, y: 1.6, z: 0 },
+                    variants: [
+                        { name: "Model 4", url: modelUrls[3], pos: { x: 10, y: 0, z: -10 }, rot: { x: 0, y: 0, z: 0 }, scale: { x: 1, y: 1, z: 1 }, htmlLeft: "html_scene2_model4_left", htmlRight: "html_scene2_model4_right", desc: modelDescriptions[3] },
+                        { name: "Model 5", url: modelUrls[4], pos: { x: 10, y: 0, z: -10 }, rot: { x: 0, y: 0, z: 0 }, scale: { x: 1, y: 1, z: 1 }, htmlLeft: null, htmlRight: null, desc: modelDescriptions[4] },
+                        { name: "Model 6", url: modelUrls[5], pos: { x: 10, y: 0, z: -10 }, rot: { x: 0, y: 0, z: 0 }, scale: { x: 1, y: 1, z: 1 }, htmlLeft: null, htmlRight: null, desc: modelDescriptions[5] }
+                    ]
+                },
+                { // Scene 3 (Index 2)
+                    cameraPos: { x: -10, y: 1.6, z: 10 },
+                    cameraLookAt: { x: -10, y: 1.6, z: 0 },
+                    variants: [
+                        { name: "Model 7", url: modelUrls[6], pos: { x: -10, y: 0, z: 10 }, rot: { x: 0, y: 0, z: 0 }, scale: { x: 1, y: 1, z: 1 }, htmlLeft: null, htmlRight: null, desc: modelDescriptions[6] },
+                        { name: "Model 8", url: modelUrls[7], pos: { x: -10, y: 0, z: 10 }, rot: { x: 0, y: 0, z: 0 }, scale: { x: 1, y: 1, z: 1 }, htmlLeft: "html_scene3_model8_left", htmlRight: "html_scene1_model1_right", desc: modelDescriptions[7] }, 
+                        { name: "Model 9", url: modelUrls[8], pos: { x: -10, y: 0, z: 10 }, rot: { x: 0, y: 0, z: 0 }, scale: { x: 1, y: 1, z: 1 }, htmlLeft: null, htmlRight: null, desc: modelDescriptions[8] }
+                    ]
+                },
+                { // Scene 4 (Index 3)
+                    cameraPos: { x: -10, y: 1.6, z: -10 },
+                    cameraLookAt: { x: -10, y: 1.6, z: 0 },
+                    variants: [
+                        { name: "Model 10", url: modelUrls[9], pos: { x: -10, y: 0, z: -10 }, rot: { x: 0, y: 0, z: 0 }, scale: { x: 1, y: 1, z: 1 }, htmlLeft: null, htmlRight: null, desc: modelDescriptions[9] },
+                        { name: "Model 11", url: modelUrls[10], pos: { x: -10, y: 1.5, z: -10 }, rot: { x: 0, y: 0, z: 0 }, scale: { x: 1, y: 1, z: 1 }, htmlLeft: null, htmlRight: null, desc: modelDescriptions[10] },
+                        { name: "Model 12", url: modelUrls[11], pos: { x: -10, y: 0, z: -10 }, rot: { x: 0, y: 0, z: 0 }, scale: { x: 1, y: 1, z: 1 }, htmlLeft: null, htmlRight: null, desc: modelDescriptions[11] }
+                    ]
+                }
+            ]
+        };
+
+        // --- WALK-THRU MODU KONFİGÜRASYONU ---
+        const walkthruConfiguration = {
+            default: { name: null, url: modelUrls[0], pos: { x: 0, y: 0, z: 0 }, rot: { x: 0, y: 0, z: 0 }, scale: { x: 5, y: 5, z: 5 }, htmlLeft: null, htmlRight: null, desc: modelDescriptions[0] },
+            scenes: [
+                { name: "Scene 1", url: modelUrls[1], pos: { x: 0, y: 0, z: 0 }, rot: { x: 0, y: 0, z: 0 }, scale: { x: 1, y: 1, z: 1 }, htmlLeft: "html_scene1_model2_left", htmlRight: null, desc: modelDescriptions[1] }, // Model 2
+                { name: "Scene 2", url: modelUrls[4], pos: { x: 0, y: 0, z: 0 }, rot: { x: 0, y: 0, z: 0 }, scale: { x: 1, y: 1, z: 1 }, htmlLeft: "walkthru_scene2_left", htmlRight: "walkthru_scene2_right", desc: modelDescriptions[4] }, // Model 5
+                { name: "Scene 3", url: modelUrls[7], pos: { x: 0, y: 0, z: 0 }, rot: { x: 0, y: 0, z: 0 }, scale: { x: 1, y: 1, z: 1 }, htmlLeft: null, htmlRight: null, desc: modelDescriptions[7] }, // Model 8
+                { name: "Scene 4", url: modelUrls[10], pos: { x: 0, y: 0, z: 0 }, rot: { x: 0, y: 0, z: 0 }, scale: { x: 1, y: 1, z: 1 }, htmlLeft: null, htmlRight: null, desc: modelDescriptions[10] } // Model 11 
+            ]
+        };
+
+        // --- LOADERS ---
+        let dracoLoader, gltfLoader;
+
+        // --- SES DEĞİŞKENLERİ ---
+        let sound1Buffer, sound2Buffer, sound3Buffer, sound4Buffer, sound5Buffer, sound6Buffer, introSoundBuffer;
+        let sound1, sound2, sound3, sound4, sound5, sound6, introSound;
+        const audioLoader = new THREE.AudioLoader();
+
+        // --- KONTROL DEĞİŞKENLERİ ---
+        let baseMoveSpeed = 20;
+        let currentMoveSpeed = baseMoveSpeed;
+        const jumpVelocity = 5;
+        let velocity = new THREE.Vector3();
+        let direction = new THREE.Vector3();
+        let prevTime = performance.now();
+        const gravity = 9.8;
+        let onFloor = true;
+        const keys = {
+            forward: false, backward: false, left: false, right: false, jump: false, sprint: false
+        };
+        let raycaster = new THREE.Raycaster();
+        let mouse = new THREE.Vector2();
+
+
+        // --- ANA FONKSİYONLAR ---
+
+        function init() {
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap; 
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            renderer.toneMappingExposure = 0.8; // Bu değer ışık yoğunluğuna göre ayarlanabilir
+            renderer.outputColorSpace = THREE.SRGBColorSpace;
+            renderer.physicallyCorrectLights = true; // Yeni ışıklarla önemli
+            renderer.xr.enabled = true;
+            document.body.appendChild(renderer.domElement);
+
+            // PMREMGenerator'ı başlat
+            pmremGenerator = new THREE.PMREMGenerator(renderer);
+
+            playerRig = new THREE.Group();
+            playerRig.position.set(15, 1.6, 0);
+            scene.add(playerRig);
+            playerRig.add(camera);
+
+            composer = new EffectComposer(renderer);
+            const renderPass = new RenderPass(scene, camera);
+            composer.addPass(renderPass);
+            bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.05, 0.4, 0.85); 
+            composer.addPass(bloomPass);
+
+            audioListener = new THREE.AudioListener();
+            camera.add(audioListener);
+
+            // Loaders
+            dracoLoader = new DRACOLoader();
+            dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.7/');
+            dracoLoader.setDecoderConfig({ type: 'js' });
+            gltfLoader = new GLTFLoader();
+            gltfLoader.setDRACOLoader(dracoLoader);
+            gltfLoader.setMeshoptDecoder(MeshoptDecoder);
+
+            setupEnvironment(); // Işıklar ve HDRI burada ayarlanacak
+            loadSounds();
+            setupEventListeners(); 
+
+            loadBaseScene(); // Ana mekanı yükle, sonra kontrolleri ayarla
+
+            renderer.setAnimationLoop(animate);
+        }
+
+        function setupEnvironment() {
+            // HDRI Yükleme (Güncellendi)
+            const hdriURL = 'https://raw.githubusercontent.com/decentralize-dfw/vea_001/main/RealismHDRI-_equirectangular-jpg_VR360_neon_drenched_skyscrapers_1656103290_10361044.hdr';
+            new RGBELoader().load(hdriURL, (texture) => {
+                texture.mapping = THREE.EquirectangularReflectionMapping;
+                scene.background = texture;  // Arka plan olarak ayarla
+                scene.environment = pmremGenerator.fromEquirectangular(texture).texture; // Yansımalar için
+                pmremGenerator.dispose(); // Artık gerek yok
+                texture.dispose();
+                // scene.environmentIntensity = 1.0; // Gerekirse yoğunluğu ayarla
+            });
+            // scene.background = new THREE.Color(0x000000); // Arka plan HDRI olacaksa bu satırı kaldır/yorumla
+
+            // Lights (Güncellendi - Yeni Bilgilere Göre)
+            // 1. HemisphereLight
+            const hemi = new THREE.HemisphereLight(0xffffff, 0x444444, 0.5);
+            hemi.position.set(0, 20, 0);
+            scene.add(hemi);
+
+            // 2. DirectionalLight (Sun)
+            const sun = new THREE.DirectionalLight(0xffffff, 3.6);
+            sun.position.set(12, 24, 12);
+            sun.castShadow = true;
+            sun.shadow.mapSize.set(2048, 2048);
+            sun.shadow.camera.near = 0.5;
+            sun.shadow.camera.far = 160; // Menzil artırıldı
+            sun.shadow.camera.left = -55; sun.shadow.camera.right = 55;
+            sun.shadow.camera.top = 55; sun.shadow.camera.bottom = -55;
+            sun.shadow.bias = -0.00012;
+            sun.shadow.normalBias = 0.02;
+            scene.add(sun);
+            // scene.add( new THREE.CameraHelper( sun.shadow.camera ) ); // Gölge kamerasını görmek için
+
+            // 3. PointLight Fill 1
+            const fill1 = new THREE.PointLight(0xffffff, 1.4, 70); // Renk, Yoğunluk, Mesafe
+            fill1.position.set(20, 12, 18);
+             // fill1.castShadow = false; // Genelde dolgu ışıkları gölge atmaz
+            scene.add(fill1);
+
+            // 4. PointLight Fill 2
+            const fill2 = new THREE.PointLight(0xffffff, 1.2, 70);
+            fill2.position.set(-18, 12, -20);
+            // fill2.castShadow = false; 
+            scene.add(fill2);
+            
+            // Eski ışıkları temizle (önlem olarak)
+            scene.remove(scene.getObjectByName("ambientLight")); // Eğer varsa
+            scene.remove(scene.getObjectByName("directionalLight")); // Eğer varsa
+            scene.remove(scene.getObjectByName("hemisphereLight")); // Eğer varsa
+        }
+
+
+        function loadBaseScene() {
+            // Ana Mekan URL Güncellendi
+            const spaceUrl = 'https://raw.githubusercontent.com/decentralize-dfw/c2w2runway/main/retailmekans-opt-v4.glb'; 
+            loadingEl.textContent = 'Loading Base Scene...'; 
+            loadingEl.style.display = 'flex'; 
+            gltfLoader.load(
+                spaceUrl,
+                (gltf) => {
+                    const spaceModel = gltf.scene;
+                    spaceModel.position.set(0, 0, 0);
+                    spaceModel.traverse((child) => {
+                        if (child.isMesh) {
+                            child.castShadow = true;
+                            child.receiveShadow = true; 
+                            // BVH ve staticMeshes kaldırıldı, şimdilik gerekmiyorsa
+                        }
+                    });
+                    scene.add(spaceModel);
+                    console.log('Retail Space loaded!');
+                    loadingEl.style.display = 'none'; 
+                    backgroundImgEl.style.display = 'block'; 
+                    
+                    bootShown = true;
+                    checkVRCapability(); 
+                },
+                (xhr) => { /* Yükleme yüzdesi */ },
+                (error) => {
+                    console.error('Error loading retail space:', error);
+                    loadingEl.textContent = 'Error: Failed to load retail space!';
+                }
+            );
+        }
+
+        async function checkVRCapability() {
+            // ... (Aynı kalabilir) ...
+             try {
+                const vrSupported = navigator.xr && await navigator.xr.isSessionSupported('immersive-vr');
+                if (vrSupported) {
+                    setupVRControls();
+                } else {
+                    setupDesktopControls();
+                }
+            } catch (e) {
+                console.error('Error checking VR support:', e);
+                setupDesktopControls();
+            }
+        }
+
+        function setupDesktopControls() {
+            // ... (Aynı kalabilir) ...
+            controls = new PointerLockControls(camera, renderer.domElement);
+            scene.remove(playerRig); 
+            scene.add(controls.getObject()); 
+            controls.getObject().position.set(15, 1.8, 0); 
+            
+            playIntroSound();
+
+            instructionsEl.style.display = 'block';
+
+            document.body.addEventListener('click', () => {
+                if (!vrControlsActive && controls && !controls.isLocked && bootShown) {
+                    controls.lock().catch(err => console.error("Pointer Lock Hatası (body click):", err));
+                 }
+            });
+            
+            controls.addEventListener('lock', () => {
+                instructionsEl.style.display = 'none';
+                backgroundImgEl.style.display = 'none';
+                if (!experienceRunning) {
+                    startButtonEl.style.display = 'block';
+                    startButtonEl.textContent = "Start";
+                }
+                console.log("Pointer locked"); 
+            });
+
+            controls.addEventListener('unlock', () => {
+                console.log("Pointer unlocked");
+                 if (bootShown && !experienceRunning) {
+                     instructionsEl.style.display = 'block';
+                 }
+            });
+        }
+
+        function setupVRControls() {
+            // ... (Aynı kalabilir) ...
+             vrControlsActive = true;
+            document.getElementById('fullscreenButton').style.display = 'none';
+            instructionsEl.style.display = 'none';
+            if (!scene.children.includes(playerRig)) {
+                 scene.add(playerRig);
+            }
+            if(controls) scene.remove(controls.getObject());
+
+
+            backgroundImgEl.src = 'https://arweave.net/I2fhARy6wX2JN1h6MbCjh5ciI5uIYw9Seei2zpSv5AU';
+            backgroundImgEl.style.display = 'block';
+            playIntroSound();
+
+            const vrButton = VRButton.createButton(renderer);
+            vrButton.textContent = 'Touch to Start';
+            vrButton.id = 'VRButton';
+            document.body.appendChild(vrButton);
+
+            const controllerModelFactory = new XRControllerModelFactory();
+            const controller1 = renderer.xr.getController(0);
+            const controllerGrip1 = renderer.xr.getControllerGrip(0);
+            controllerGrip1.add(controllerModelFactory.createControllerModel(controllerGrip1));
+            playerRig.add(controller1); 
+            playerRig.add(controllerGrip1); 
+            vrControllers.push(controller1);
+
+            const controller2 = renderer.xr.getController(1);
+            const controllerGrip2 = renderer.xr.getControllerGrip(1);
+            controllerGrip2.add(controllerModelFactory.createControllerModel(controllerGrip2));
+            playerRig.add(controller2); 
+            playerRig.add(controllerGrip2); 
+            vrControllers.push(controller2);
+
+             function onConnected(event) {
+                 event.target.userData.gamepad = event.data.gamepad;
+                 event.target.userData.hand = event.data.handedness;
+                 console.log(`Controller connected: ${event.data.handedness}`);
+             }
+             controller1.addEventListener('connected', onConnected);
+             controller2.addEventListener('connected', onConnected);
+
+
+            renderer.xr.addEventListener('sessionstart', () => {
+                console.log('VR Session Started');
+                startButtonEl.style.display = 'none';
+                backgroundImgEl.style.display = 'none';
+                document.getElementById('initiating').style.display = 'block';
+                fadeOutIntroSound();
+                
+                playerRig.position.set(15, 1.6, 0); // VR başlangıç pozisyonu
+                experienceRunning = true;
+                currentSceneIndex = -1; 
+                advanceScene(); 
+            });
+
+            renderer.xr.addEventListener('sessionend', () => {
+                console.log('VR Session Ended');
+                window.location.reload();
+            });
+        }
+        
+        function setupEventListeners() {
+            // ... (Aynı kalabilir) ...
+             // Klavye
+            document.addEventListener('keydown', (event) => {
+                if (vrControlsActive) return;
+                // Sadece walkthru modunda hareket tuşlarını etkinleştir
+                if (walkthruMode) {
+                    switch (event.code) {
+                        case 'KeyW': keys.forward = true; break;
+                        case 'KeyS': keys.backward = true; break;
+                        case 'KeyA': keys.left = true; break;
+                        case 'KeyD': keys.right = true; break;
+                        case 'Space': if (onFloor) { keys.jump = true; } break;
+                        case 'ShiftLeft': keys.sprint = true; currentMoveSpeed = baseMoveSpeed * 4; break;
+                    }
+                }
+                 // Tam ekran tuşu her zaman çalışsın
+                 if (event.code === 'KeyF') {
+                     toggleFullscreen();
+                 }
+            });
+            document.addEventListener('keyup', (event) => {
+                if (vrControlsActive) return;
+                 // Sadece walkthru modunda hareket tuşlarını devre dışı bırak
+                 if (walkthruMode) {
+                    switch (event.code) {
+                        case 'KeyW': keys.forward = false; break;
+                        case 'KeyS': keys.backward = false; break;
+                        case 'KeyA': keys.left = false; break;
+                        case 'KeyD': keys.right = false; break;
+                        case 'Space': keys.jump = false; break;
+                        case 'ShiftLeft': keys.sprint = false; currentMoveSpeed = baseMoveSpeed; break;
+                    }
+                 }
+            });
+
+            // Mouse (Sadece Raycasting için)
+            window.addEventListener('mousemove', onMouseMove);
+            window.addEventListener('click', onMouseClick); // Model link tıklaması için gerekli
+
+
+            // UI Butonları
+            startButtonEl.addEventListener('click', (event) => {
+                event.stopPropagation(); // Diğer click eventlerini tetiklemesin
+                 if (walkthruMode) { // Walkthru modundaysa sayfayı yenile (çıkış)
+                     window.location.reload();
+                     return;
+                 }
+                if (!experienceRunning) {
+                    fadeOutIntroSound();
+                    document.getElementById('initiating').style.display = 'block';
+                    experienceRunning = true;
+                }
+                advanceScene(); // Sahneyi ilerlet (yeni sahne modellerini yükleyecek)
+            });
+
+            modelToggleButtons.forEach((btn, index) => {
+                btn.addEventListener('click', (event) => {
+                    event.stopPropagation(); // Diğer click eventlerini tetiklemesin
+                    if (walkthruMode) {
+                        loadWalkthruScene(index); // Walkthru'da sahne değiştir
+                    } else {
+                        showModelVariant(index); // Normal modda modeli GÖSTER
+                    }
+                });
+            });
+
+            // Diğer info panel butonları
+            setupInfoPanelToggle('projectInfoButton', 'projectInfoPanel', 'closeButton');
+            setupInfoPanelToggle('studioInfoButton', 'studioInfoPanel', 'studioCloseButton');
+            setupInfoPanelToggle('hintButton', 'hintPanel', 'hintCloseButton');
+            setupInfoPanelToggle('creatorsNoteButton', 'creatorsNotePanel', 'creatorsCloseButton');
+            document.getElementById('fullscreenButton').addEventListener('click', (e) => { e.stopPropagation(); toggleFullscreen(); });
+            
+            // Resize
+            window.addEventListener('resize', () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+                composer.setSize(window.innerWidth, window.innerHeight);
+            });
+        }
+        
+        function setupInfoPanelToggle(buttonId, panelId, closeButtonId) {
+            // ... (Aynı kalabilir) ...
+            const button = document.getElementById(buttonId);
+            const panel = document.getElementById(panelId);
+            const closeButton = document.getElementById(closeButtonId);
+            const allButtons = [
+                document.getElementById('projectInfoButton'),
+                document.getElementById('studioInfoButton'),
+                document.getElementById('hintButton'),
+                document.getElementById('creatorsNoteButton')
+            ];
+            const allPanels = [
+                document.getElementById('projectInfoPanel'),
+                document.getElementById('studioInfoPanel'),
+                document.getElementById('hintPanel'),
+                document.getElementById('creatorsNotePanel')
+            ];
+
+            button.addEventListener('click', (event) => {
+                event.stopPropagation();
+                const isPanelOpen = panel.style.display === 'block';
+                
+                allPanels.forEach(p => p.style.display = 'none');
+                allButtons.forEach(b => b.style.opacity = '1');
+                
+                if (!isPanelOpen) {
+                    panel.style.display = 'block';
+                    button.style.opacity = '0.5';
+                }
+            });
+            closeButton.addEventListener('click', (event) => {
+                event.stopPropagation();
+                panel.style.display = 'none';
+                button.style.opacity = '1';
+            });
+            panel.addEventListener('click', (event) => event.stopPropagation());
+        }
+
+        // --- SAHNE YÖNETİMİ ---
+
+        async function advanceScene() { 
+            // ... (Aynı kalabilir) ...
+            document.getElementById('initiating').style.display = 'none';
+            unloadSceneModels(); 
+            
+            currentSceneIndex++;
+            currentModelVariantIndex = -1; 
+            
+            if (currentSceneIndex >= sceneConfiguration.scenes.length) {
+                enterWalkthruMode(); 
+            } else {
+                await loadScene(currentSceneIndex); 
+            }
+        }
+
+        async function loadScene(sceneIndex) {
+            // ... (Aynı kalabilir) ...
+            if (sceneIndex < 0 || sceneIndex >= sceneConfiguration.scenes.length) return;
+            
+            sceneLoadingIndicatorEl.style.display = 'block'; 
+            const sceneData = sceneConfiguration.scenes[sceneIndex];
+            const camPos = sceneData.cameraPos;
+            const lookAtPos = sceneData.cameraLookAt; 
+            
+            if (vrControlsActive) {
+                playerRig.position.set(camPos.x, camPos.y, camPos.z);
+            } else {
+                 controls.getObject().position.set(camPos.x, camPos.y, camPos.z);
+                 camera.lookAt(new THREE.Vector3(lookAtPos.x, lookAtPos.y, lookAtPos.z));
+            }
+
+            updateModelToggleButtons(sceneData.variants);
+            
+            const loadPromises = sceneData.variants.map((variantData, index) => 
+                loadModel(variantData, index, false) 
+            );
+
+            try {
+                const loadedModels = await Promise.all(loadPromises);
+                currentSceneModels = loadedModels.filter(m => m !== null); 
+                
+                showModelVariant(0); 
+                
+            } catch (error) {
+                console.error("Error loading scene models:", error);
+            } finally {
+                 sceneLoadingIndicatorEl.style.display = 'none'; 
+            }
+        }
+        
+        function showModelVariant(variantIndexToShow) {
+             // ... (Aynı kalabilir) ...
+             if (walkthruMode) return; 
+             if (currentSceneIndex < 0) return;
+
+             const sceneData = sceneConfiguration.scenes[currentSceneIndex];
+             if (!sceneData || variantIndexToShow < 0 || variantIndexToShow >= sceneData.variants.length) {
+                 console.error("Geçersiz sahne veya gösterilecek varyant indeksi:", currentSceneIndex, variantIndexToShow);
+                 return;
+             }
+             
+             currentSceneModels.forEach(modelEntry => {
+                 if (modelEntry.scene) modelEntry.scene.visible = false;
+             });
+
+             const modelToShow = currentSceneModels.find(m => m.variantIndex === variantIndexToShow);
+
+             if (modelToShow && modelToShow.scene) {
+                 modelToShow.scene.visible = true;
+                 currentModelVariantIndex = variantIndexToShow; 
+                 
+                 updateHtmlPanels(modelToShow.modelData.htmlLeft, modelToShow.modelData.htmlRight);
+                 descriptionEl.textContent = modelToShow.modelData.desc || '';
+                 descriptionEl.style.display = modelToShow.modelData.desc ? 'block' : 'none';
+
+                 modelToggleButtons.forEach((btn, index) => {
+                     btn.classList.toggle('selected', index === variantIndexToShow);
+                 });
+                 console.log(`Showing model variant: ${variantIndexToShow}`);
+             } else {
+                  console.warn(`Model variant ${variantIndexToShow} not found or not loaded yet.`);
+             }
+        }
+
+
+        function enterWalkthruMode() {
+            // ... (Aynı kalabilir) ...
+            walkthruMode = true;
+            unloadSceneModels(); 
+            
+            console.log("Entering Walk-thru Mode");
+
+             if (vrControlsActive) {
+                 playerRig.position.set(0, 1.6, 5);
+             } else {
+                 controls.getObject().position.set(0, 1.6, 5);
+                 camera.lookAt(0, 1.6, 0); 
+             }
+
+            modelLabelEl.textContent = "Scene";
+            const walkthruScenes = walkthruConfiguration.scenes;
+            walkthruScenes.forEach((scene, index) => {
+                if (modelToggleButtons[index]) {
+                    modelToggleButtons[index].textContent = scene.name;
+                    modelToggleButtons[index].style.display = 'block';
+                    modelToggleButtons[index].classList.remove('selected');
+                }
+            });
+             if (modelToggleButtons[3] && walkthruScenes[3]) {
+                 modelToggleButtons[3].style.display = 'block';
+             }
+
+            startButtonEl.textContent = "Exit Walk-thru"; 
+            startButtonEl.style.display = 'block'; 
+            startButtonEl.onclick = (e) => { e.stopPropagation(); window.location.reload(); }; 
+
+            loadModel(walkthruConfiguration.default, -1, true) 
+                .then(loadedModel => {
+                    if(loadedModel) currentSceneModels = [loadedModel]; 
+                }); 
+            currentModelVariantIndex = -1; 
+        }
+
+        async function loadWalkthruScene(sceneId) { 
+            // ... (Aynı kalabilir) ...
+            if (!walkthruMode) return;
+            if (sceneId < 0 || sceneId >= walkthruConfiguration.scenes.length) return;
+
+            unloadSceneModels(); 
+            sceneLoadingIndicatorEl.style.display = 'block'; 
+
+            const sceneData = walkthruConfiguration.scenes[sceneId];
+            currentModelVariantIndex = sceneId; 
+
+            modelToggleButtons.forEach((btn, index) => {
+                btn.classList.toggle('selected', index === sceneId);
+            });
+
+            try {
+                 const loadedModel = await loadModel(sceneData, sceneId, true); 
+                 if(loadedModel) currentSceneModels = [loadedModel]; 
+            } catch (error) {
+                 console.error("Error loading walkthru scene model:", error)
+            } finally {
+                 sceneLoadingIndicatorEl.style.display = 'none'; 
+            }
+        }
+
+
+        // --- MODEL YÜKLEME / KALDIRMA ---
+
+        function loadModel(modelData, variantIndex, isVisible = false) {
+             // ... (Aynı kalabilir) ...
+             return new Promise((resolve, reject) => {
+                if (!modelData || !modelData.url) {
+                    console.warn("Invalid model data for loading:", modelData);
+                    resolve(null); 
+                    return;
+                }
+                
+                 console.log(`Loading model: ${modelData.name || modelData.url} (Visible: ${isVisible})`);
+                 
+                 if (isVisible) {
+                     updateHtmlPanels(modelData.htmlLeft, modelData.htmlRight);
+                     descriptionEl.textContent = modelData.desc || '';
+                     descriptionEl.style.display = modelData.desc ? 'block' : 'none';
+                 }
+
+                gltfLoader.load(
+                    modelData.url,
+                    (gltf) => {
+                        const modelScene = gltf.scene;
+                        modelScene.position.set(modelData.pos.x, modelData.pos.y, modelData.pos.z);
+                        modelScene.rotation.set(modelData.rot.x, modelData.rot.y, modelData.rot.z);
+                        modelScene.scale.set(modelData.scale.x, modelData.scale.y, modelData.scale.z);
+                        modelScene.visible = isVisible; 
+
+                        let mixer = null;
+                        if (gltf.animations && gltf.animations.length > 0) {
+                            mixer = new THREE.AnimationMixer(modelScene);
+                            gltf.animations.forEach((clip) => {
+                                const action = mixer.clipAction(clip);
+                                action.loop = THREE.LoopRepeat;
+                                action.play(); 
+                            });
+                        }
+                        
+                        modelScene.traverse((child) => {
+                            if (child.isMesh) {
+                                child.castShadow = true;
+                                child.receiveShadow = true;
+                                if (child.name === 'balls' && child.material.name === 'TT') {
+                                     if(child.material) child.material.emissiveIntensity = 100;
+                                } else if (child.material && child.material.emissive) {
+                                     child.material.emissiveIntensity = 1;
+                                }
+                            }
+                        });
+
+                        scene.add(modelScene);
+                        console.log(`Model loaded: ${modelData.name || modelData.url}`);
+                        resolve({ variantIndex, scene: modelScene, mixer, modelData }); 
+                    },
+                    undefined, 
+                    (error) => {
+                        console.error(`Error loading model ${modelData.url}:`, error);
+                        reject(error); 
+                    }
+                );
+            });
+        }
+        
+        function unloadSceneModels() {
+             // ... (Aynı kalabilir) ...
+             console.log(`Unloading ${currentSceneModels.length} models from scene.`);
+             currentSceneModels.forEach(modelEntry => {
+                if (modelEntry.scene) {
+                    if (modelEntry.mixer) {
+                        modelEntry.mixer.stopAllAction();
+                    }
+                    scene.remove(modelEntry.scene);
+                    
+                    modelEntry.scene.traverse((child) => {
+                        if (child.isMesh) {
+                            if(child.geometry) child.geometry.dispose();
+                            if(child.material) {
+                                if (Array.isArray(child.material)) {
+                                    child.material.forEach(mat => { if(mat) mat.dispose(); });
+                                } else {
+                                    child.material.dispose();
+                                }
+                            }
+                        }
+                    });
+                }
+             });
+             currentSceneModels = []; 
+             currentModelVariantIndex = -1; 
+             
+            updateHtmlPanels(null, null);
+            descriptionEl.style.display = 'none';
+        }
+
+
+        // --- YARDIMCI FONKSİYONLAR ---
+
+        function updateModelToggleButtons(variants) {
+            // ... (Aynı kalabilir) ...
+            modelLabelEl.style.display = 'block';
+            modelToggleButtons.forEach((btn, index) => {
+                if (index < variants.length) {
+                    btn.textContent = variants[index].name || `Model ${index + 1}`;
+                    btn.style.display = 'block';
+                    btn.classList.remove('selected');
+                } else {
+                    btn.style.display = 'none'; 
+                }
+            });
+            if (!walkthruMode && modelToggleButtons[3]) {
+                 modelToggleButtons[3].style.display = 'none';
+            }
+        }
+        
+        function updateHtmlPanels(leftId, rightId) {
+            // ... (Aynı kalabilir) ...
+            const leftContentEl = leftId ? document.getElementById(leftId) : null;
+            if (leftContentEl) {
+                leftHtmlPanel.innerHTML = leftContentEl.innerHTML;
+                leftHtmlPanel.style.display = 'block';
+            } else {
+                leftHtmlPanel.innerHTML = '';
+                leftHtmlPanel.style.display = 'none';
+            }
+            
+            const rightContentEl = rightId ? document.getElementById(rightId) : null;
+             if (rightContentEl) {
+                rightHtmlPanel.innerHTML = rightContentEl.innerHTML;
+                rightHtmlPanel.style.display = 'block';
+            } else {
+                rightHtmlPanel.innerHTML = '';
+                rightHtmlPanel.style.display = 'none';
+            }
+        }
+        
+        function toggleFullscreen() {
+            // ... (Aynı kalabilir) ...
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(err => console.error('Full screen error:', err));
+            } else {
+                document.exitFullscreen().catch(err => console.error('Exit full screen error:', err));
+            }
+        }
+        
+        function onMouseMove(event) {
+             // ... (Aynı kalabilir) ...
+             if (!vrControlsActive && controls && controls.isLocked) { 
+                raycaster.setFromCamera({ x: 0, y: 0 }, camera);
+                const intersects = raycaster.intersectObjects(scene.children, true);
+                const hoverText = document.getElementById('hoverText');
+                
+                let foundClickable = false;
+                if (intersects.length > 0) {
+                    for (let i = 0; i < intersects.length; i++) {
+                         if (intersects[i].distance < 10) { 
+                            if (intersects[i].object.name === 'balls' || intersects[i].object.name === 'Body' || intersects[i].object.userData?.clickable) {
+                                foundClickable = true;
+                                break;
+                            }
+                         }
+                    }
+                }
+                
+                hoverText.style.display = foundClickable ? 'block' : 'none';
+            } else {
+                 document.getElementById('hoverText').style.display = 'none'; 
+            }
+        }
+
+        function onMouseClick(event) {
+             // ... (Aynı kalabilir) ...
+             if (!vrControlsActive && controls && controls.isLocked) { 
+                raycaster.setFromCamera({ x: 0, y: 0 }, camera);
+                const intersects = raycaster.intersectObjects(scene.children, true);
+
+                if (intersects.length > 0) {
+                     for (let i = 0; i < intersects.length; i++) {
+                         if (intersects[i].distance < 10) { 
+                            if (intersects[i].object.name === 'balls' || intersects[i].object.name === 'Body' || intersects[i].object.userData?.clickable) {
+                                window.open(intersects[i].object.userData?.link || 'https://www.digitalforgerywork.shop/c2w2', '_blank');
+                                event.stopPropagation(); 
+                                break;
+                            }
+                         }
+                     }
+                }
+            }
+        }
+
+        // --- SES YÖNETİMİ ---
+        function loadSounds() {
+            // ... (Aynı kalabilir) ...
+            const soundUrl1 = 'https://arweave.net/RQNUMGVhM8wcjNkLjEd6BQFanS5uB_t0Y3ZeuAIg0ew';
+            const soundUrl2 = 'https://arweave.net/TDBkb0oFpfSlffXbNqRYmmOZw6TME84Rcf9qzh2QkG8';
+            const soundUrl3 = 'https://arweave.net/Y0722novhkkb0ZDA8EaZ3RKQTk76_JT52q5pc_Ijy1c';
+            const soundUrl4 = 'https://arweave.net/09XemuPQNP8641acUMuDhisppxdP_YIb6FUL8k7vMqo';
+            const soundUrl5 = 'https://arweave.net/W6oEXyeEiPs3YW4GSePsA1LzoAq5ha2rf0cT0j0VdUU';
+            const soundUrl6 = 'https://arweave.net/jfe12LN5xSTUCp0uYTSue9mrKB4kP-25mej-9S6FxVQ';
+            const introSoundUrl = null; 
+
+            audioLoader.load(soundUrl1, (buffer) => { sound1Buffer = buffer; console.log('Sound 1 buffer loaded'); });
+            audioLoader.load(soundUrl2, (buffer) => { sound2Buffer = buffer; console.log('Sound 2 buffer loaded'); });
+            audioLoader.load(soundUrl3, (buffer) => { sound3Buffer = buffer; console.log('Sound 3 buffer loaded'); });
+            audioLoader.load(soundUrl4, (buffer) => { sound4Buffer = buffer; console.log('Sound 4 buffer loaded'); });
+            audioLoader.load(soundUrl5, (buffer) => { sound5Buffer = buffer; console.log('Sound 5 buffer loaded'); });
+            audioLoader.load(soundUrl6, (buffer) => { sound6Buffer = buffer; console.log('Sound 6 buffer loaded'); });
+            
+            if (introSoundUrl) {
+                audioLoader.load(introSoundUrl, (buffer) => {
+                    introSoundBuffer = buffer;
+                    console.log('Intro sound buffer loaded');
+                    if (!vrControlsActive) {
+                        playIntroSound();
+                    }
+                });
+            }
+        }
+
+        function playSound(buffer, loop = false) {
+             // ... (Aynı kalabilir) ...
+             if (!buffer) {
+                 console.error('Sound buffer not ready');
+                 return null;
+             }
+             
+             let sound = new THREE.Audio(audioListener);
+             
+             const play = () => {
+                sound.setBuffer(buffer);
+                sound.setLoop(loop);
+                sound.setVolume(0.5);
+                sound.play();
+                console.log('Sound played');
+             };
+
+             if (audioListener.context.state === 'suspended') {
+                audioListener.context.resume().then(play).catch(e => console.error('AudioContext resume failed:', e));
+             } else {
+                play();
+             }
+             return sound;
+        }
+        
+        function playIntroSound() {
+             // ... (Aynı kalabilir) ...
+            if (introSoundBuffer) {
+                introSound = playSound(introSoundBuffer, true);
+            }
+        }
+
+        function fadeOutIntroSound() {
+             // ... (Aynı kalabilir) ...
+            if (introSound && introSound.isPlaying) {
+                const currentTime = audioListener.context.currentTime;
+                if(introSound.gain) {
+                    introSound.gain.gain.linearRampToValueAtTime(0, currentTime + 4);
+                } else {
+                    console.warn("Could not access gain node for fading.")
+                    introSound.setVolume(0); 
+                }
+
+                setTimeout(() => {
+                    introSound.stop();
+                    console.log('Intro sound faded out and stopped');
+                }, 4000);
+            }
+        }
+        
+        // --- RENDER DÖNGÜSÜ ---
+        function animate() {
+            // ... (Aynı kalabilir) ...
+            const delta = clock.getDelta();
+            const time = performance.now();
+            const physicsDelta = Math.min(0.05, delta); 
+
+            // Kontrolleri güncelle (Desktop)
+            if (!vrControlsActive && controls && controls.isLocked && walkthruMode) {
+                // ... Hareket kodları ...
+                velocity.x -= velocity.x * 10.0 * physicsDelta;
+                velocity.z -= velocity.z * 10.0 * physicsDelta;
+                velocity.y -= gravity * physicsDelta;
+                direction.z = Number(keys.forward) - Number(keys.backward);
+                direction.x = Number(keys.right) - Number(keys.left);
+                direction.normalize(); 
+                if (keys.forward || keys.backward) velocity.z -= direction.z * currentMoveSpeed * physicsDelta;
+                if (keys.left || keys.right) velocity.x -= direction.x * currentMoveSpeed * physicsDelta;
+                if (keys.jump && onFloor) {
+                    velocity.y = jumpVelocity;
+                    onFloor = false; 
+                }
+                controls.moveRight(-velocity.x * physicsDelta); 
+                controls.moveForward(-velocity.z * physicsDelta); 
+                 controls.getObject().position.y += (velocity.y * physicsDelta);
+                if (controls.getObject().position.y < 1.6) {
+                    velocity.y = 0; 
+                    controls.getObject().position.y = 1.6; 
+                    onFloor = true; 
+                } else {
+                     onFloor = false; 
+                }
+            } else if (!vrControlsActive && controls && controls.isLocked && !walkthruMode) {
+                  if (currentSceneIndex >= 0 && currentSceneIndex < sceneConfiguration.scenes.length) {
+                       controls.getObject().position.y = sceneConfiguration.scenes[currentSceneIndex].cameraPos.y; 
+                  } else {
+                      controls.getObject().position.y = 1.6; 
+                  }
+                 velocity.y = 0; 
+                 onFloor = true; 
+            }
+            
+            // Kontrolleri güncelle (VR)
+            if (vrControlsActive && renderer.xr.isPresenting) {
+                 // ... VR hareket kodları ...
+                velocity.x -= velocity.x * 10.0 * physicsDelta;
+                velocity.z -= velocity.z * 10.0 * physicsDelta;
+                velocity.y -= gravity * physicsDelta;
+                let moveSpeed = 80;
+                let moveDirection = new THREE.Vector3(0, 0, 0);
+                let moveGamepad = null;
+                let turnGamepad = null;
+                vrControllers.forEach(ctrl => {
+                    if (ctrl.userData.hand === 'left' && ctrl.userData.gamepad) moveGamepad = ctrl.userData.gamepad;
+                    else if (ctrl.userData.hand === 'right' && ctrl.userData.gamepad) turnGamepad = ctrl.userData.gamepad;
+                });
+                if (moveGamepad) {
+                    if (Math.abs(moveGamepad.axes[2]) > 0.2) moveDirection.x = moveGamepad.axes[2]; 
+                    if (Math.abs(moveGamepad.axes[3]) > 0.2) moveDirection.z = moveGamepad.axes[3]; 
+                    if (moveGamepad.buttons[0] && moveGamepad.buttons[0].value > 0.5) moveSpeed = 80 * 4;
+                }
+                if (turnGamepad) {
+                    if (Math.abs(turnGamepad.axes[2]) > 0.2) playerRig.rotateY(-turnGamepad.axes[2] * delta * 2.0); 
+                }
+                if (moveDirection.length() > 0.01) {
+                    const cameraDirection = new THREE.Vector3();
+                    camera.getWorldDirection(cameraDirection);
+                    cameraDirection.y = 0;
+                    cameraDirection.normalize();
+                    const rightDirection = new THREE.Vector3().crossVectors(camera.up, cameraDirection).normalize(); 
+                    const forwardVector = cameraDirection.multiplyScalar(-moveDirection.z * moveSpeed * physicsDelta); 
+                    const rightVector = rightDirection.multiplyScalar(moveDirection.x * moveSpeed * physicsDelta); 
+                    velocity.x += forwardVector.x + rightVector.x;
+                    velocity.z += forwardVector.z + rightVector.z;
+                }
+                playerRig.position.x += velocity.x * physicsDelta;
+                playerRig.position.z += velocity.z * physicsDelta;
+                playerRig.position.y += velocity.y * physicsDelta;
+                if (playerRig.position.y < 1.6) {
+                    velocity.y = 0;
+                    playerRig.position.y = 1.6;
+                    onFloor = true;
+                } else {
+                    onFloor = false;
+                }
+            }
+
+            // Animasyonları güncelle
+            currentSceneModels.forEach(modelEntry => {
+                 if (modelEntry.mixer) {
+                    modelEntry.mixer.update(delta); 
+                 }
+            });
+
+            // Render
+            if (renderer.xr.isPresenting) {
+                renderer.render(scene, camera);
+            } else {
+                composer.render();
+            }
+        }
+        
+        // --- BAŞLAT ---
+        init();
+
+    </script>
+</body>
+</html>
+
