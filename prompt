@@ -45,3 +45,70 @@ load scene 2: load model 5
 falan gibi en son toggle da scene ler arasın istediğiim i seçebilmeliyim. ve yazabilmeliyim kodda hangisi nerede olacak. 
 
 
+
+------------------------GROK ANALİZ
+
+İsteği analiz etme
+Kullanıcının talebini inceliyorum, mevcut Three.js tabanlı VR ve desktop kodunu desktop odaklı hale getirmek için düzenlemem gerekiyor.
+
+İframe modunu tamamen kaldırarak, sadece desktop versiyonuna odaklanacağım, VR modunu olduğu gibi bırakacağım.
+
+Model yükleme fonksiyonunu genişleteceğim, her model için konum, rotasyon ve ölçek ayarlanabilir hale gelecek, ayrıca kamera aktivasyonu eklenecek.
+
+Sahne yapısını tanımlayacağım, 4 sahne (kullanıcı 10 demiş ama 4 belirtmiş) her biri 3 modelle, üstte 1,2,3 toggle butonları isimli olacak.
+Kod yapısını düzenleme
+PointerLockControls'ü kaldırıp OrbitControls'e geçeceğim, sahne gösterimi için 360 derece kilitli kamera görüşü sağlayacak.
+
+Start butonunu manuel ilerleme için ayarlayacağım, her basışta bir sonraki sahneye veya modele geçecek, otomatik 30 saniye beklemeyi kaldıracağım.
+
+Sahne konfigürasyonlarını array olarak tanımlayacağım, her sahne için model listesi, pozisyon, kamera ayarları ve HTML panelleri eklenecek.
+
+Model toggle butonlarını sahne içi model seçimi için kullanacağım, lens butonlarını kaldırıp kamera ayarlarını desktop'a uyarlayacağım.
+Panel ve mod ekleme
+Sol ve sağ panelleri ekleyeceğim, 300x600 px boyutunda, her sahne-model için özel HTML yükleyecek, null veya random seçenekli.
+
+Walkthru modunu sahne sonrasına taşıyacağım, üst butonları sahne seçimine dönüştürecek, PointerLock ile serbest hareket sağlayacağım.
+
+Tam kodu baştan sona yazacağım, tüm değişikliklerle eksiksiz, gereksiz kısımları kaldırarak süper bir yapı oluşturacağım.
+
+Kodda model isimlerini modelDescriptions array'inden çekeceğim, buton metinlerini dinamik hale getireceğim, walkthru için özel konfigürasyon array'i ekleyeceğim.
+Model yükleme genişletme
+loadModel fonksiyonunu parametre alacak şekilde güncelleyeceğim, index, parent, pos, rot, scale ile model konumunu ayarlayabileceğim.
+
+Buton sayısını 4'e çıkaracağım, sequence modunda 1-3 model için, walkthru'da 1-4 sahne için kullanılacak.
+
+Start butonuna her basışta mevcut sahneyi silip sonraki sahnenin ilk modelini yükleyeceğim, toggle butonları sahne içi model değiştirecek.
+
+Sahne geçişlerinde kamera pozisyonunu otomatik ayarlayacağım, walkthru modunda serbest gezinme için kontrolleri açacağım.
+Sahne konfigürasyonu tanımlama
+Scenes array'ini oluşturacağım, her sahne için modelPos (örneğin scene1: new THREE.Vector3(10, 0, 10)), modelRot, modelScale ve models [1,2,3] gibi ayarlar ekleyeceğim.
+
+Kamera başlangıç pozisyonlarını sahne bazında tanımlayacağım, örneğin scene1 için cameraInitPos: new THREE.Vector3(18, 1.6, 10), hedef model pozisyonuna bakacak şekilde.
+
+HTML panelleri için 2D array tanımlayacağım, sceneHtmls[0][0].left = 'html11.html' gibi, null için panel gizlenecek, random için fonksiyon ekleyeceğim.
+
+Desktop kontrollerini OrbitControls ile başlatacağım, başlangıçta devre dışı bırakıp yükleme sonrası etkinleştireceğim, model etiketini 'Model' olarak değiştireceğim.
+Panel gösterim fonksiyonu
+Sol ve sağ iframe'leri tanımlayacağım, showPanel fonksiyonu ile URL'e göre src ayarlayıp paneli göstereceğim veya gizleyeceğim.
+
+Walkthru modunda model yükleme için config kullanacağım, loadModel ile pozisyon, rotasyon ve ölçek ayarlayıp animasyonu tetikleyeceğim.
+
+VR modunda eski runSequence'i koruyacağım, loadModel çağrılarını yeni parametrelerle uyumlu hale getireceğim, pozisyonları 0,0,0 olarak geçeceğim.
+
+Tam HTML kodunu baştan yazacağım, gereksiz iframe ve lens elementlerini kaldırıp, yeni model butonlarını ve panelleri ekleyeceğim.
+
+Start butonu için onStart fonksiyonu ekleyeceğim, sequence modunda sahne ilerletecek, walkthru'ya geçiş yapacak, buton metnini 'Next Scene' olarak güncelleyeceğim.
+Mod geçişlerini ayarlama
+Sequence modunda start butonu her basışta bir sonraki sahneyi yükleyecek, ilk modelini seçecek ve kamera ayarlarını kilitleyecek.
+
+Walkthru moduna geçişte mevcut modeli silecek, model 1'i 0,0,0 pozisyonuna yükleyecek, toggle butonlarını sahne seçimine dönüştürecek.
+
+Model yükleme sırasında currentModelIndex'i takip edeceğim, unloadCurrentModel ile mevcut modeli temizleyip dispose edeceğim.
+
+Buton seçimi için event listener'lar ekleyeceğim, sequence'ta modelLocal değiştirip yükleme yapacak, walkthru'da sahne değiştirip config yükleyecek.
+
+İlk start basışında deneyimi başlatacağım, talimat panelini gizleyip sahne 1 model 1'i yükleyeceğim, buton metnini 'Next' olarak ayarlayacağım.
+
+Kodun tamamını eksiksiz olarak aşağıda sunuyorum, tüm değişiklikler uygulanmış halde.
+
+
